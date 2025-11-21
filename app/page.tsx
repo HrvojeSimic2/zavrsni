@@ -11,7 +11,6 @@ import {
   ArrowRight,
   Compass,
   Star,
-  MessageCircle,
   Sparkles,
 } from "lucide-react";
 import Link from "next/link";
@@ -379,8 +378,8 @@ export default function HomePage() {
         </div>
 
         <div className="container relative py-20 md:py-32">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            <div className="space-y-8 lg:pr-8">
+          <div className="max-w-4xl mx-auto text-center space-y-12">
+            <div className="space-y-8">
               <Badge className="bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 border-primary-foreground/20 rounded-full px-4 py-1.5 inline-flex items-center gap-2">
                 <Sparkles className="h-3.5 w-3.5" />
                 For Local Guides
@@ -390,13 +389,73 @@ export default function HomePage() {
                 <h2 className="text-4xl md:text-6xl font-bold text-primary-foreground text-balance leading-tight">
                   Share Your World, Earn Income
                 </h2>
-                <p className="text-xl text-primary-foreground/90 leading-relaxed text-pretty max-w-xl">
+                <p className="text-xl text-primary-foreground/90 leading-relaxed text-pretty max-w-2xl mx-auto">
                   Turn your local knowledge into meaningful connections and
                   income. Join guides worldwide who share their passion with
                   travelers.
                 </p>
               </div>
+            </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 max-w-5xl mx-auto">
+              <div className="flex flex-col items-center gap-4 bg-primary-foreground/5 p-6 rounded-3xl backdrop-blur-sm hover:bg-primary-foreground/10 transition-all duration-300 hover:-translate-y-2 hover:shadow-xl">
+                <div className="shrink-0 w-16 h-16 rounded-2xl bg-primary-foreground/15 flex items-center justify-center">
+                  <MapPin className="h-8 w-8 text-primary-foreground" />
+                </div>
+                <div className="text-center">
+                  <p className="font-semibold text-primary-foreground text-lg">
+                    Flexible Schedule
+                  </p>
+                  <p className="text-sm text-primary-foreground/80 mt-1">
+                    Work when you want
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center gap-4 bg-primary-foreground/5 p-6 rounded-3xl backdrop-blur-sm hover:bg-primary-foreground/10 transition-all duration-300 hover:-translate-y-2 hover:shadow-xl">
+                <div className="shrink-0 w-16 h-16 rounded-2xl bg-primary-foreground/15 flex items-center justify-center">
+                  <Users className="h-8 w-8 text-primary-foreground" />
+                </div>
+                <div className="text-center">
+                  <p className="font-semibold text-primary-foreground text-lg">
+                    Global Community
+                  </p>
+                  <p className="text-sm text-primary-foreground/80 mt-1">
+                    Connect worldwide
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center gap-4 bg-primary-foreground/5 p-6 rounded-3xl backdrop-blur-sm hover:bg-primary-foreground/10 transition-all duration-300 hover:-translate-y-2 hover:shadow-xl">
+                <div className="shrink-0 w-16 h-16 rounded-2xl bg-primary-foreground/15 flex items-center justify-center">
+                  <Shield className="h-8 w-8 text-primary-foreground" />
+                </div>
+                <div className="text-center">
+                  <p className="font-semibold text-primary-foreground text-lg">
+                    Trusted Platform
+                  </p>
+                  <p className="text-sm text-primary-foreground/80 mt-1">
+                    Safe & secure
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center gap-4 bg-primary-foreground/5 p-6 rounded-3xl backdrop-blur-sm hover:bg-primary-foreground/10 transition-all duration-300 hover:-translate-y-2 hover:shadow-xl">
+                <div className="shrink-0 w-16 h-16 rounded-2xl bg-primary-foreground/15 flex items-center justify-center">
+                  <Heart className="h-8 w-8 text-primary-foreground" />
+                </div>
+                <div className="text-center">
+                  <p className="font-semibold text-primary-foreground text-lg">
+                    Meaningful Impact
+                  </p>
+                  <p className="text-sm text-primary-foreground/80 mt-1">
+                    Share your culture
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-6">
               <Button
                 size="lg"
                 variant="secondary"
@@ -408,101 +467,6 @@ export default function HomePage() {
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </Button>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-6">
-                <div className="flex items-start gap-3 bg-primary-foreground/5 p-4 rounded-2xl backdrop-blur-sm hover:bg-primary-foreground/10 transition-colors">
-                  <div className="shrink-0 w-12 h-12 rounded-2xl bg-primary-foreground/10 flex items-center justify-center">
-                    <MapPin className="h-6 w-6 text-primary-foreground" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-primary-foreground">
-                      Flexible Schedule
-                    </p>
-                    <p className="text-sm text-primary-foreground/80">
-                      Work when you want
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 bg-primary-foreground/5 p-4 rounded-2xl backdrop-blur-sm hover:bg-primary-foreground/10 transition-colors">
-                  <div className="shrink-0 w-12 h-12 rounded-2xl bg-primary-foreground/10 flex items-center justify-center">
-                    <Star className="h-6 w-6 text-primary-foreground" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-primary-foreground">
-                      Build Your Brand
-                    </p>
-                    <p className="text-sm text-primary-foreground/80">
-                      Grow your reputation
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 bg-primary-foreground/5 p-4 rounded-2xl backdrop-blur-sm hover:bg-primary-foreground/10 transition-colors">
-                  <div className="shrink-0 w-12 h-12 rounded-2xl bg-primary-foreground/10 flex items-center justify-center">
-                    <Heart className="h-6 w-6 text-primary-foreground" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-primary-foreground">
-                      Make an Impact
-                    </p>
-                    <p className="text-sm text-primary-foreground/80">
-                      Support your community
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 bg-primary-foreground/5 p-4 rounded-2xl backdrop-blur-sm hover:bg-primary-foreground/10 transition-colors">
-                  <div className="shrink-0 w-12 h-12 rounded-2xl bg-primary-foreground/10 flex items-center justify-center">
-                    <MessageCircle className="h-6 w-6 text-primary-foreground" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-primary-foreground">
-                      Connect Globally
-                    </p>
-                    <p className="text-sm text-primary-foreground/80">
-                      Meet people worldwide
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="relative hidden lg:block">
-              <div className="relative h-[600px] max-w-lg mx-auto">
-                <Card className="overflow-hidden absolute top-8 right-0 w-[65%] z-20 rotate-6 hover:rotate-3 shadow-2xl border-2 border-primary-foreground/10 hover:shadow-primary-foreground/20 transition-all duration-300 rounded-3xl group">
-                  <div className="relative aspect 3/4">
-                    <Image
-                      src="/thai-man-portrait.png"
-                      alt="Local guide"
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                  </div>
-                </Card>
-
-                <Card className="overflow-hidden absolute top-32 left-0 w-[65%] z-10 -rotate-6 hover:-rotate-3 shadow-2xl border-2 border-primary-foreground/10 hover:shadow-primary-foreground/20 transition-all duration-300 rounded-3xl group">
-                  <div className="relative aspect 3/4">
-                    <Image
-                      src="/vietnamese-woman-portrait.png"
-                      alt="Local guide"
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                  </div>
-                </Card>
-
-                <Card className="overflow-hidden absolute bottom-0 right-12 w-[60%] rotate-3 hover:rotate-1 shadow-2xl border-2 border-primary-foreground/10 hover:shadow-primary-foreground/20 transition-all duration-300 rounded-3xl group">
-                  <div className="relative aspect 3/4">
-                    <Image
-                      src="/balinese-man-portrait.jpg"
-                      alt="Local guide"
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                  </div>
-                </Card>
-              </div>
             </div>
           </div>
         </div>

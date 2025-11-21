@@ -93,7 +93,7 @@ export default function BrowsePage() {
       <Navigation />
 
       {/* Header */}
-      <section className="bg-gradient-to-br from-primary/10 via-background to-secondary/10 border-b">
+      <section className="bg-linear-to-br from-primary/10 via-background to-secondary/10 border-b">
         <div className="container py-12">
           <div className="max-w-3xl space-y-4">
             <h1 className="text-4xl md:text-5xl font-bold text-balance">
@@ -312,7 +312,7 @@ function TourCard({ tour }: { tour: Tour }) {
               <div className="flex items-center gap-1">
                 <p className="text-sm font-medium truncate">{tour.guide.name}</p>
                 {tour.guide.verified && (
-                  <CheckCircle2 className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                  <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
