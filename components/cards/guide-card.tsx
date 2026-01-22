@@ -9,11 +9,12 @@ import { CheckCircle2, MapPin, Star, Users } from "lucide-react";
 
 export function GuideCard({ tour }: { tour: Tour }) {
   const categoryColors = {
-    food: "bg-secondary/10 text-secondary border-secondary/20",
-    nature: "bg-primary/10 text-primary border-primary/20",
-    culture: "bg-chart-3/10 text-chart-3 border-chart-3/20",
-    adventure: "bg-chart-4/10 text-chart-4 border-chart-4/20",
-    history: "bg-chart-5/10 text-chart-5 border-chart-5/20",
+    food: "bg-amber-800/50 text-white border-amber-800",
+    nature: "bg-emerald-600/50 text-white border-emerald-600",
+    culture: "bg-fuchsia-400/50 text-white border-fuchsia-400",
+    adventure: "bg-rose-700/50 text-white border-rose-700",
+    history: "bg-yellow-400/50 text-white border-yellow-400",
+    other: "bg-gray-600/50 text-white border-gray-600",
   };
   const firstName = tour.guide.name.split(" ")[0] || tour.guide.name;
   const languageList = tour.guide.languages.join(" / ");

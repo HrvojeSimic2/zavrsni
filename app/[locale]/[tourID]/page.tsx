@@ -26,7 +26,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTourById, getSimilarTours } from "@/lib/actions/tour-actions";
 import { getReviewsByTourId } from "@/lib/actions/review-actions";
-
+import { useTranslations } from "next-intl";
 export default async function TourDetailPage({
   params,
 }: {
@@ -37,6 +37,7 @@ export default async function TourDetailPage({
   if (!tour) {
     notFound();
   }
+  const t = useTranslations("Tours");
 
   const [reviews, similarTours] = await Promise.all([
     getReviewsByTourId(tour.id),
@@ -69,7 +70,8 @@ export default async function TourDetailPage({
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
               <div className="space-y-3">
                 <Badge className={categoryColors[tour.category]}>
-                  {tour.category.charAt(0).toUpperCase() + tour.category.slice(1)}
+                  {tour.category.charAt(0).toUpperCase() +
+                    tour.category.slice(1)}
                 </Badge>
                 <h1 className="text-3xl md:text-5xl font-bold text-white text-balance">
                   {tour.title}
@@ -109,7 +111,9 @@ export default async function TourDetailPage({
                 <Card>
                   <CardContent className="pt-6 text-center space-y-2">
                     <Clock className="h-6 w-6 mx-auto text-primary" />
-                    <div className="text-sm text-muted-foreground">Duration</div>
+                    <div className="text-sm text-muted-foreground">
+                      {t("duration")}
+                    </div>
                     <div className="font-semibold">{tour.duration}</div>
                   </CardContent>
                 </Card>
@@ -125,7 +129,9 @@ export default async function TourDetailPage({
                 <Card>
                   <CardContent className="pt-6 text-center space-y-2">
                     <Globe className="h-6 w-6 mx-auto text-primary" />
-                    <div className="text-sm text-muted-foreground">Languages</div>
+                    <div className="text-sm text-muted-foreground">
+                      Languages
+                    </div>
                     <div className="font-semibold text-sm">
                       {tour.guide.languages.join(", ")}
                     </div>
@@ -383,7 +389,10 @@ export default async function TourDetailPage({
                       <label className="text-sm font-medium mb-2 block">
                         Select Date
                       </label>
-                      <Button variant="outline" className="w-full justify-start">
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                      >
                         <Calendar className="mr-2 h-4 w-4" />
                         Choose a date
                       </Button>
@@ -393,9 +402,11 @@ export default async function TourDetailPage({
                       <label className="text-sm font-medium mb-2 block">
                         Guests
                       </label>
-                      <Button variant="outline" className="w-full justify-start">
-                        <Users className="mr-2 h-4 w-4" />
-                        1 guest
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                      >
+                        <Users className="mr-2 h-4 w-4" />1 guest
                       </Button>
                     </div>
                   </div>
