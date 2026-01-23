@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, MapPin, Star, Users } from "lucide-react";
-
+import { useLocale } from "next-intl";
 export function GuideCard({ tour }: { tour: Tour }) {
   const categoryColors = {
     food: "bg-amber-800/50 text-white border-amber-800",
@@ -18,9 +18,10 @@ export function GuideCard({ tour }: { tour: Tour }) {
   };
   const firstName = tour.guide.name.split(" ")[0] || tour.guide.name;
   const languageList = tour.guide.languages.join(" / ");
+  const locale = useLocale();
 
   return (
-    <Link href={`/tour/${tour.id}`}>
+    <Link href={`/${locale}/tour/${tour.id}`}>
       <Card className="overflow-hidden h-full hover:shadow-xl transition-all group">
         <div className="relative h-56 overflow-hidden">
           <Image

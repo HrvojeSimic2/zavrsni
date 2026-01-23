@@ -1,14 +1,19 @@
 'use client'
 
 import { Link } from "@/i18n/routing";
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { MapPin, Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LocaleSwitcher } from "@/components/ui/locale-switcher";
+import { createClient } from "@/lib/supabase/client";
+import type { Session } from "@supabase/supabase-js";
+import { useLocale } from "next-intl";
 
 export function Navigation() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [session, setSession] = useState<Session | null>(null)
+  const locale = useLocale()
 
   const navLinks = [
     { href: "/browse", label: "Browse Tours" },
@@ -17,6 +22,25 @@ export function Navigation() {
   ];
 
   const closeMenu = () => setIsMobileMenuOpen(false)
+  const signOutAction = `/${locale}/auth/sign-out`
+
+  useEffect(() => {
+    const supabase = createClient()
+
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session)
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession)
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
 
   return (
     <>
@@ -47,12 +71,22 @@ export function Navigation() {
 
           <div className="flex items-center gap-3">
             <LocaleSwitcher className="hidden md:flex" />
-            <Button variant="ghost" size="sm" className="hidden md:flex">
-              Sign In
-            </Button>
-            <Button size="sm" className="hidden md:inline-flex">
-              Get Started
-            </Button>
+            {session ? (
+              <form action={signOutAction} method="post" className="hidden md:flex">
+                <Button variant="ghost" size="sm" type="submit">
+                  Sign Out
+                </Button>
+              </form>
+            ) : (
+              <>
+                <Button variant="ghost" size="sm" className="hidden md:flex" asChild>
+                  <Link href="/auth/sign-in">Sign In</Link>
+                </Button>
+                <Button size="sm" className="hidden md:inline-flex" asChild>
+                  <Link href="/auth/sign-up">Get Started</Link>
+                </Button>
+              </>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -120,17 +154,37 @@ export function Navigation() {
           </div>
 
           <div className="mt-auto border-t px-6 py-6 flex flex-col gap-3">
-            <Button
-              variant="ghost"
-              size="lg"
-              className="justify-start"
-              onClick={closeMenu}
-            >
-              Sign In
-            </Button>
-            <Button size="lg" className="w-full" onClick={closeMenu}>
-              Get Started
-            </Button>
+            {session ? (
+              <form action={signOutAction} method="post">
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  className="w-full justify-start"
+                  type="submit"
+                  onClick={closeMenu}
+                >
+                  Sign Out
+                </Button>
+              </form>
+            ) : (
+              <>
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  className="justify-start"
+                  asChild
+                >
+                  <Link href="/auth/sign-in" onClick={closeMenu}>
+                    Sign In
+                  </Link>
+                </Button>
+                <Button size="lg" className="w-full" asChild>
+                  <Link href="/auth/sign-up" onClick={closeMenu}>
+                    Get Started
+                  </Link>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>
