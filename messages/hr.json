@@ -59,5 +59,37 @@
     "step3Title": "Doživi i Istraži",
     "step3Body": "Upoznaj svog vodiča i kreni na nezaboravno putovanje kroz skrivena mjesta, lokalne priče i autentične kulture koje će obogatiti tvoje putovanje.",
     "ctaButton": "Započni Svoje Putovanje"
+  },
+  "Profile": {
+    "title": "Profil",
+    "subtitle": "Upravljajte podacima računa i profilnom fotografijom.",
+    "signOut": "Odjava",
+    "photoTitle": "Profilna fotografija",
+    "photoSubtitle": "Koristi se u cijelom LocalPathu.",
+    "memberSince": "Član od {date}",
+    "uploadLabel": "Učitaj novu fotografiju",
+    "uploadHelp": "PNG, JPG ili GIF do 5 MB.",
+    "uploadButton": "Učitaj",
+    "detailsTitle": "Osobni podaci",
+    "detailsSubtitle": "Održavajte svoje podatke ažurnima.",
+    "fullNameLabel": "Ime i prezime",
+    "emailLabel": "E-pošta",
+    "preferredLanguageLabel": "Preferirani jezik",
+    "saveChanges": "Spremi promjene",
+    "fallbackDisplayName": "Vaš račun",
+    "profileLoadWarning": "Nismo mogli učitati vaš profil iz Supabasea. Neka polja mogu nedostajati dok ne osvježite stranicu.",
+    "flash": {
+      "messages": {
+        "profileUpdated": "Profil je ažuriran.",
+        "photoUpdated": "Profilna fotografija je ažurirana."
+      },
+      "errors": {
+        "chooseImage": "Odaberite sliku za učitavanje.",
+        "imageOnly": "Učitajte datoteku slike.",
+        "maxSize": "Učitajte sliku veličine do 5 MB.",
+        "saveFailed": "Nismo mogli spremiti promjene. Pokušajte ponovno.",
+        "uploadFailed": "Nismo mogli učitati fotografiju. Pokušajte ponovno."
+      }
+    }
   }
 }

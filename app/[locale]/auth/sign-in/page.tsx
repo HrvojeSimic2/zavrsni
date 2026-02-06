@@ -7,8 +7,17 @@ import { Label } from "@/components/ui/label";
 
 type PageProps = {
   params: { locale: string } | Promise<{ locale: string }>;
-  searchParams?: { error?: string; message?: string } | Promise<{ error?: string; message?: string }>;
+  searchParams?:
+    | { error?: string; message?: string; next?: string }
+    | Promise<{ error?: string; message?: string; next?: string }>;
 };
+
+function safePath(path: string, fallback: string) {
+  if (path.startsWith("/")) {
+    return path;
+  }
+  return fallback;
+}
 
 export default async function SignInPage({ params, searchParams }: PageProps) {
   const { locale } = await Promise.resolve(params);
@@ -21,6 +30,11 @@ export default async function SignInPage({ params, searchParams }: PageProps) {
     typeof resolvedSearchParams?.message === "string"
       ? resolvedSearchParams.message
       : "";
+  const next =
+    typeof resolvedSearchParams?.next === "string"
+      ? resolvedSearchParams.next
+      : "";
+  const redirectTo = safePath(next || `/${locale}`, `/${locale}`);
 
   return (
     <Card className="w-full max-w-md">
@@ -46,7 +60,7 @@ export default async function SignInPage({ params, searchParams }: PageProps) {
           <input
             type="hidden"
             name="redirectTo"
-            value={`/${locale}`}
+            value={redirectTo}
           />
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>

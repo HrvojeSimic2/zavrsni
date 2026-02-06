@@ -1,9 +1,7 @@
-import { signUpAction } from "../actions";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { SignUpForm } from "./sign-up-form";
 
 type PageProps = {
   params: { locale: string } | Promise<{ locale: string }>;
@@ -41,67 +39,7 @@ export default async function SignUpPage({ params, searchParams }: PageProps) {
             {message}
           </div>
         ) : null}
-        <form action={signUpAction} className="space-y-4">
-          <input type="hidden" name="locale" value={locale} />
-          <input
-            type="hidden"
-            name="redirectTo"
-            value={`/${locale}`}
-          />
-          <div className="space-y-2">
-            <Label htmlFor="fullName">Full name</Label>
-            <Input
-              id="fullName"
-              name="fullName"
-              type="text"
-              autoComplete="name"
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="avatarUrl">Profile image URL (optional)</Label>
-            <Input
-              id="avatarUrl"
-              name="avatarUrl"
-              type="url"
-              autoComplete="url"
-              placeholder="https://example.com/avatar.png"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="new-password"
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm password</Label>
-            <Input
-              id="confirmPassword"
-              name="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              required
-            />
-          </div>
-          <Button type="submit" className="w-full">
-            Create account
-          </Button>
-        </form>
+        <SignUpForm locale={locale} redirectTo={`/${locale}`} />
       </CardContent>
       <CardFooter className="flex flex-col text-sm text-muted-foreground">
         <span>

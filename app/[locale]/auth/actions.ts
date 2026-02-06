@@ -3,8 +3,13 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getFileFromFormData, uploadAvatarFile } from "@/lib/supabase/storage";
 
 type MessageType = "error" | "message";
+
+function isDebugEnabled() {
+  return process.env.SUPABASE_DEBUG === "1";
+}
 
 function getString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -23,6 +28,18 @@ async function getOrigin() {
   const protocol = headersList.get("x-forwarded-proto") ?? "http";
 
   return host ? `${protocol}://${host}` : "http://localhost:3000";
+}
+
+function getConfiguredSiteUrl() {
+  const value =
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    process.env.SITE_URL ??
+    process.env.VERCEL_URL;
+
+  if (!value) return null;
+  if (value.startsWith("http://") || value.startsWith("https://")) return value;
+  // Handle VERCEL_URL which is typically host without protocol.
+  return `https://${value}`;
 }
 
 function safePath(path: string, fallback: string) {
@@ -74,7 +91,8 @@ export async function signInAction(formData: FormData) {
 
 export async function signUpAction(formData: FormData) {
   const fullName = getString(formData, "fullName");
-  const avatarUrl = getString(formData, "avatarUrl");
+  const avatarFile = getFileFromFormData(formData, "avatarFile");
+  const avatarUrl = avatarFile ? "" : getString(formData, "avatarUrl");
   const email = getString(formData, "email");
   const password = getString(formData, "password");
   const confirmPassword = getString(formData, "confirmPassword");
@@ -108,10 +126,20 @@ export async function signUpAction(formData: FormData) {
     );
   }
 
-  const origin = await getOrigin();
+  const configuredSiteUrl = getConfiguredSiteUrl();
+  const origin = configuredSiteUrl ?? (await getOrigin());
   const callbackUrl = `${origin}/${locale}/auth/callback?next=${encodeURIComponent(
     redirectTo
   )}`;
+
+  if (isDebugEnabled()) {
+    console.log("[auth.signUpAction] redirect context", {
+      locale,
+      redirectTo,
+      origin,
+      callbackUrl,
+    });
+  }
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
@@ -133,6 +161,44 @@ export async function signUpAction(formData: FormData) {
       "error",
       error.message
     );
+  }
+
+  if (avatarFile && data.session?.user) {
+    try {
+      await supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      });
+    } catch (sessionError) {
+      console.warn("[auth.signUpAction] session sync failed", sessionError);
+    }
+
+    const uploadResult = await uploadAvatarFile(
+      supabase,
+      data.session.user.id,
+      avatarFile
+    );
+
+    const uploadError = "error" in uploadResult ? uploadResult.error : null;
+    const publicUrl = "publicUrl" in uploadResult ? uploadResult.publicUrl : null;
+
+    if (!uploadError && publicUrl) {
+      const cacheBustedUrl = `${publicUrl}?v=${Date.now()}`;
+      await Promise.allSettled([
+        supabase.auth.updateUser({
+          data: { avatar_url: cacheBustedUrl },
+        }),
+        supabase
+          .from("profiles")
+          .update({ avatar_url: cacheBustedUrl })
+          .eq("id", data.session.user.id),
+      ]);
+    } else {
+      console.warn(
+        "[auth.signUpAction] avatar upload failed",
+        uploadError?.message ?? uploadError
+      );
+    }
   }
 
   if (data.session) {

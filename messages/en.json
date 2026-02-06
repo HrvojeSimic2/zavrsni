@@ -59,5 +59,37 @@
     "step3Title": "Experience and Explore",
     "ctaButton": "Start Exploring",
     "step3Body": "Meet your guide and embark on an unforgettable journey through hidden spots, local stories, and authentic cultures that will enrich your travel."
+  },
+  "Profile": {
+    "title": "Profile",
+    "subtitle": "Manage your account details and profile photo.",
+    "signOut": "Sign out",
+    "photoTitle": "Profile photo",
+    "photoSubtitle": "Used across LocalPath.",
+    "memberSince": "Member since {date}",
+    "uploadLabel": "Upload new photo",
+    "uploadHelp": "PNG, JPG, or GIF up to 5MB.",
+    "uploadButton": "Upload",
+    "detailsTitle": "Personal details",
+    "detailsSubtitle": "Keep your information up to date.",
+    "fullNameLabel": "Full name",
+    "emailLabel": "Email",
+    "preferredLanguageLabel": "Preferred language",
+    "saveChanges": "Save changes",
+    "fallbackDisplayName": "Your account",
+    "profileLoadWarning": "We couldn't load your profile from Supabase. Some fields may be missing until you refresh.",
+    "flash": {
+      "messages": {
+        "profileUpdated": "Profile updated.",
+        "photoUpdated": "Profile photo updated."
+      },
+      "errors": {
+        "chooseImage": "Please choose an image to upload.",
+        "imageOnly": "Please upload an image file.",
+        "maxSize": "Please upload an image up to 5MB.",
+        "saveFailed": "We couldn't save your changes. Please try again.",
+        "uploadFailed": "We couldn't upload your photo. Please try again."
+      }
+    }
   }
 }
