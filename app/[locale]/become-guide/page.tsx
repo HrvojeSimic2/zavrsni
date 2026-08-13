@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Navigation } from "@/components/navigation";
-import { Footer } from "@/components/footer";
+import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -34,8 +33,12 @@ import {
   MessageCircle,
 } from "lucide-react";
 import Image from "next/image";
+import { useParams } from "next/navigation";
 
 export default function BecomeGuidePage() {
+  const params = useParams<{ locale?: string }>();
+  const locale = typeof params?.locale === "string" ? params.locale : undefined;
+
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -48,15 +51,69 @@ export default function BecomeGuidePage() {
     agreedToTerms: false,
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [submitState, setSubmitState] = useState<
+    | { status: "idle" }
+    | { status: "submitting" }
+    | { status: "success"; message: string }
+    | { status: "error"; message: string }
+  >({ status: "idle" });
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Form submitted:", formData);
-    // Handle form submission
+
+    if (!formData.agreedToTerms) {
+      setSubmitState({
+        status: "error",
+        message: "Please accept the terms to submit your application.",
+      });
+      return;
+    }
+
+    setSubmitState({ status: "submitting" });
+
+    try {
+      const res = await fetch("/api/guide-applications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...formData, locale }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        const message =
+          typeof body?.error === "string"
+            ? body.error
+            : "Failed to submit application.";
+        setSubmitState({ status: "error", message });
+        return;
+      }
+
+      setSubmitState({
+        status: "success",
+        message:
+          "Application submitted! Our team will review it and get back to you shortly.",
+      });
+      setFormData({
+        firstName: "",
+        lastName: "",
+        email: "",
+        phone: "",
+        location: "",
+        languages: "",
+        experience: "",
+        tourIdeas: "",
+        agreedToTerms: false,
+      });
+    } catch (error) {
+      setSubmitState({
+        status: "error",
+        message: error instanceof Error ? error.message : "Something went wrong.",
+      });
+    }
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navigation />
+    <PageShell variant="full">
 
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-linear-to-br from-primary via-primary/90 to-primary/80 text-primary-foreground">
@@ -96,7 +153,7 @@ export default function BecomeGuidePage() {
 
             <div className="flex items-center justify-center gap-8 pt-8 text-primary-foreground/90">
               <div>
-                <div className="text-3xl font-bold">$2,500</div>
+                <div className="text-3xl font-bold">2.500 €</div>
                 <div className="text-sm">Avg Monthly Income</div>
               </div>
               <div className="h-12 w-px bg-primary-foreground/20" />
@@ -136,7 +193,7 @@ export default function BecomeGuidePage() {
                 <h3 className="font-semibold text-xl">Earn Good Income</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   Set your own prices and keep 85% of your earnings. Many guides
-                  make $2,000-5,000/month part-time.
+                  make 2.000-5.000 €/month part-time.
                 </p>
               </CardContent>
             </Card>
@@ -595,13 +652,28 @@ export default function BecomeGuidePage() {
                   </label>
                 </div>
 
+                {submitState.status === "error" ? (
+                  <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    {submitState.message}
+                  </div>
+                ) : null}
+                {submitState.status === "success" ? (
+                  <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                    {submitState.message}
+                  </div>
+                ) : null}
+
                 <Button
                   type="submit"
                   size="lg"
                   className="w-full"
-                  disabled={!formData.agreedToTerms}
+                  disabled={
+                    !formData.agreedToTerms || submitState.status === "submitting"
+                  }
                 >
-                  Submit Application
+                  {submitState.status === "submitting"
+                    ? "Submitting..."
+                    : "Submit Application"}
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
 
@@ -635,7 +707,7 @@ export default function BecomeGuidePage() {
                 </h3>
                 <p className="text-muted-foreground leading-relaxed pl-7">
                   Earnings vary based on your pricing, availability, and
-                  location. Most active guides earn $2,000-5,000 per month. You
+                  location. Most active guides earn 2.000-5.000 € per month. You
                   keep 85% of your tour price, and you set your own rates.
                 </p>
               </CardContent>
@@ -689,7 +761,6 @@ export default function BecomeGuidePage() {
         </div>
       </section>
 
-      <Footer />
-    </div>
+    </PageShell>
   );
 }

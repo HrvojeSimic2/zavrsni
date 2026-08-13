@@ -1,5 +1,4 @@
-import { Navigation } from "@/components/navigation";
-import { Footer } from "@/components/footer";
+import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,9 +16,12 @@ import { Link } from "@/i18n/routing";
 import Image from "next/image";
 import { getTranslations } from "next-intl/server";
 import { HeroSection } from "@/components/homepage/hero-section";
+import { getHomepageGuidesData } from "@/lib/actions/guide-actions";
+import { GuideSpotlight } from "@/components/homepage/guide-spotlight";
 
 export default async function HomePage() {
   const t = await getTranslations("Home");
+  const spotlightGuides = await getHomepageGuidesData();
   const whySection = (
     <section className="py-24 lg:py-32 relative overflow-hidden">
       <div className="absolute right-0 top-1/3 w-96 h-96 bg-primary/3 rounded-full blur-3xl" />
@@ -206,13 +208,11 @@ export default async function HomePage() {
   );
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navigation />{" "}
-      {/*TODO: AFTER COMPLETING THE AUTH FLOW, MOVE THIS BACK TO LAYOUT*/}
+    <PageShell variant="full">
       <HeroSection />
+      <GuideSpotlight guides={spotlightGuides} />
       {whySection}
       {guideCtaSection}
-      <Footer />
-    </div>
+    </PageShell>
   );
 }

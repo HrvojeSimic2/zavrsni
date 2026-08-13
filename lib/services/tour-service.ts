@@ -63,6 +63,16 @@ const mapTourRow = (row: TourRow): Tour => {
   }; 
 };
 
+type TourAvailabilityRow = {
+  date: string;
+  available_spots: number | null;
+};
+
+export type TourAvailabilityDay = {
+  date: string;
+  availableSpots: number;
+};
+
 export async function fetchTours(): Promise<Tour[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -110,4 +120,28 @@ export async function fetchSimilarTours(
   }
 
   return (data ?? []).map(mapTourRow);
+}
+
+export async function fetchTourAvailability(
+  tourId: string,
+  startDateISO: string,
+  endDateISO: string
+): Promise<TourAvailabilityDay[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tour_availability")
+    .select("date, available_spots")
+    .eq("tour_id", tourId)
+    .gte("date", startDateISO)
+    .lte("date", endDateISO)
+    .order("date", { ascending: true });
+
+  if (error) {
+    throw new Error(`Failed to fetch tour availability: ${error.message}`);
+  }
+
+  return (data as TourAvailabilityRow[] | null | undefined)?.map((row) => ({
+    date: row.date,
+    availableSpots: row.available_spots ?? 0,
+  })) ?? [];
 }

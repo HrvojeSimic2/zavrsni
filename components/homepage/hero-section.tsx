@@ -11,8 +11,44 @@ import { Card } from "../ui/card";
 import { Button } from "../ui/button";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useEffect, useState } from "react";
+import { useRouter } from "@/i18n/routing";
 export function HeroSection() {
   const t = useTranslations("Home");
+  const router = useRouter();
+  const [where, setWhere] = useState("");
+  const [interest, setInterest] = useState("all");
+  const [availableToday, setAvailableToday] = useState(false);
+
+  useEffect(() => {
+    try {
+      setWhere(String(localStorage.getItem("lp.where") ?? ""));
+    } catch {}
+  }, []);
+
+  const goToMatches = () => {
+    const params = new URLSearchParams();
+    const trimmedWhere = where.trim();
+    if (trimmedWhere) {
+      params.set("where", trimmedWhere);
+      try {
+        localStorage.setItem("lp.where", trimmedWhere);
+      } catch {}
+    }
+    if (interest && interest !== "all") params.set("interest", interest);
+    if (availableToday) params.set("available", "today");
+    const query = params.toString();
+    router.push(query ? `/browse?${query}` : "/browse");
+  };
   return (
     <section className="relative overflow-hidden">
       <div className="absolute inset-0 -z-10">
@@ -59,11 +95,13 @@ export function HeroSection() {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <Button size="lg" className="rounded-full text-base px-8" asChild>
-                <Link href="/browse">
-                  {t("ctaExplore")}
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Link>
+              <Button
+                size="lg"
+                className="rounded-full text-base px-8"
+                onClick={goToMatches}
+              >
+                {t("ctaExplore")}
+                <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
               <Button
                 size="lg"
@@ -74,6 +112,51 @@ export function HeroSection() {
                 <Link href="/become-guide">{t("ctaGuide")}</Link>
               </Button>
             </div>
+
+            <Card className="p-5 rounded-3xl border-2 bg-background/70 backdrop-blur-md">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Input
+                  value={where}
+                  onChange={(e) => setWhere(e.target.value)}
+                  placeholder="Where are you?"
+                  className="h-12 rounded-2xl bg-background"
+                />
+
+                <Select value={interest} onValueChange={setInterest}>
+                  <SelectTrigger className="h-12 rounded-2xl bg-background">
+                    <SelectValue placeholder="What are you into?" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Any interest</SelectItem>
+                    <SelectItem value="food">Food</SelectItem>
+                    <SelectItem value="nature">Nature</SelectItem>
+                    <SelectItem value="culture">Culture</SelectItem>
+                    <SelectItem value="adventure">Adventure</SelectItem>
+                    <SelectItem value="history">History</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <div className="flex items-center justify-between gap-4 rounded-2xl border bg-background px-4 h-12">
+                  <label className="text-sm font-medium">
+                    Available today
+                  </label>
+                  <Checkbox
+                    checked={availableToday}
+                    onCheckedChange={(next) => setAvailableToday(Boolean(next))}
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 flex flex-col sm:flex-row gap-3">
+                <Button className="rounded-full" onClick={goToMatches}>
+                  Show best matches
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+                <Button variant="outline" className="rounded-full" asChild>
+                  <Link href="/browse">Browse all guides</Link>
+                </Button>
+              </div>
+            </Card>
           </div>
 
           <div className="relative lg:pl-8">

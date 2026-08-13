@@ -1,11 +1,7 @@
-import React from "react";
+import { defaultLocale } from "@/i18n/routing";
+import { redirect } from "next/navigation";
 
-const page = () => {
-  return (
-    <div>
-      <h1>PEJDDŽ</h1>
-    </div>
-  );
-};
+export default function RootPage() {
+  redirect(`/${defaultLocale}`);
+}
 
-export default page;

@@ -1,5 +1,4 @@
-import { Navigation } from "@/components/navigation";
-import { Footer } from "@/components/footer";
+import { PageShell } from "@/components/layout/page-shell";
 
 export default function AuthLayout({
   children,
@@ -7,14 +6,11 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navigation />
-      <main className="flex-1">
-        <div className="container flex min-h-[60vh] items-center justify-center py-12">
-          {children}
-        </div>
-      </main>
-      <Footer />
-    </div>
+    <PageShell
+      variant="contained"
+      contentClassName="flex min-h-[60vh] items-center justify-center"
+    >
+      {children}
+    </PageShell>
   );
 }

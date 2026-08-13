@@ -6,7 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "supabase:start": "npx supabase start",
+    "supabase:stop": "npx supabase stop",
+    "supabase:reset": "npx supabase db reset",
+    "supabase:push": "npx supabase db push",
+    "seed:guide": "node scripts/seed-guide-data.mjs",
+    "reservations:settle": "node scripts/settle-reservations.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -75,6 +81,7 @@
     "@types/pg": "^8.16.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "baseline-browser-mapping": "^2.9.19",
     "postcss": "^8.5",
     "prisma": "^6.19.1",
     "tailwindcss": "^4.1.9",

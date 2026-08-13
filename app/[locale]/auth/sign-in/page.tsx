@@ -1,4 +1,5 @@
 import { signInAction } from "../actions";
+import { AuthDivider, GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -55,6 +56,8 @@ export default async function SignInPage({ params, searchParams }: PageProps) {
             {message}
           </div>
         ) : null}
+        <GoogleSignInButton locale={locale} redirectTo={redirectTo} />
+        <AuthDivider />
         <form action={signInAction} className="space-y-4">
           <input type="hidden" name="locale" value={locale} />
           <input

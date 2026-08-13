@@ -1,7 +1,11 @@
-import Link from "next/link";
+"use client";
+
+import { Link } from "@/i18n/routing";
 import { MapPin, Facebook, Instagram, Twitter } from "lucide-react";
 
 export function Footer() {
+  const year = new Date().getFullYear();
+
   return (
     <footer className="border-t bg-muted/30">
       <div className="container py-12">
@@ -14,25 +18,28 @@ export function Footer() {
               <span className="text-lg font-semibold">LocalPath</span>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Connecting travelers with authentic local experiences around the
-              world.
+              Matching travelers with the right local guides for fully customizable
+              experiences.
             </p>
             <div className="flex gap-3">
               <Link
                 href="#"
                 className="text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Facebook"
               >
                 <Facebook className="h-5 w-5" />
               </Link>
               <Link
                 href="#"
                 className="text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Instagram"
               >
                 <Instagram className="h-5 w-5" />
               </Link>
               <Link
                 href="#"
                 className="text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Twitter"
               >
                 <Twitter className="h-5 w-5" />
               </Link>
@@ -47,31 +54,31 @@ export function Footer() {
                   href="/browse"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Browse Tours
+                  Find Guides
                 </Link>
               </li>
               <li>
                 <Link
-                  href="/browse?category=food"
+                  href="/browse?available=today"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Food Tours
+                  Available Today
                 </Link>
               </li>
               <li>
                 <Link
-                  href="/browse?category=nature"
+                  href="/browse?interest=food"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Nature Tours
+                  Food Lovers
                 </Link>
               </li>
               <li>
                 <Link
-                  href="/browse?category=culture"
+                  href="/browse?interest=culture"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Cultural Experiences
+                  Culture & Stories
                 </Link>
               </li>
             </ul>
@@ -155,12 +162,10 @@ export function Footer() {
         </div>
 
         <div className="mt-8 pt-8 border-t text-center text-sm text-muted-foreground">
-          <p>
-            © 2025 LocalPath. All rights reserved. Discover the world through
-            local eyes.
-          </p>
+          <p>© {year} LocalPath. All rights reserved.</p>
         </div>
       </div>
     </footer>
   );
 }
+

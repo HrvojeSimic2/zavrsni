@@ -7,11 +7,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MapPin, Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LocaleSwitcher } from "@/components/ui/locale-switcher";
+import { NotificationsBell } from "@/components/notifications/notifications-bell";
 import { createClient } from "@/lib/supabase/client";
 import { clearPendingAvatar, loadPendingAvatar } from "@/lib/supabase/pending-avatar";
 import { uploadAvatarFile } from "@/lib/supabase/storage";
 import type { Session } from "@supabase/supabase-js";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 type Profile = {
   full_name: string | null;
@@ -43,15 +44,22 @@ function getInitials(name: string) {
 
 export function Navigation() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [session, setSession] = useState<Session | null>(null)
+  // `undefined` means "still loading" to avoid flashing signed-out UI.
+  const [session, setSession] = useState<Session | null | undefined>(undefined)
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [hasGuideDashboard, setHasGuideDashboard] = useState<boolean>(false);
   const pendingAvatarSyncKeyRef = useRef<string | null>(null);
   const locale = useLocale()
+  const t = useTranslations("Navigation");
+  const isSessionLoaded = session !== undefined;
 
   const navLinks = [
-    { href: "/browse", label: "Browse Tours" },
-    { href: "/become-guide", label: "Become a Guide" },
-    { href: "/how-it-works", label: "How It Works" },
+    { href: "/browse", label: t("browse") },
+    hasGuideDashboard
+      ? { href: "/guide", label: t("dashboard") }
+      : { href: "/become-guide", label: t("guide") },
+    { href: "/how-it-works", label: t("how") },
+    ...(session ? [{ href: "/bookings", label: t("trips") }] : []),
   ];
 
   const closeMenu = () => setIsMobileMenuOpen(false)
@@ -76,6 +84,46 @@ export function Navigation() {
 
       setProfile(data ?? null);
       return data ?? null;
+    }
+
+    async function loadGuideStatus(userId: string, email: string) {
+      const normalizedEmail = email.trim().toLowerCase();
+
+      const { data: guideByUser, error: guideByUserError } = await supabase
+        .from("guides")
+        .select("id")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (!isActive) return;
+
+      if (guideByUserError) {
+        console.warn("[nav.guides] failed to check guide by user_id", guideByUserError);
+      }
+
+      if (guideByUser?.id) {
+        setHasGuideDashboard(true);
+        return;
+      }
+
+      if (!normalizedEmail) {
+        setHasGuideDashboard(false);
+        return;
+      }
+
+      const { data: guideByEmail, error: guideByEmailError } = await supabase
+        .from("guides")
+        .select("id, user_id")
+        .eq("email", normalizedEmail)
+        .maybeSingle();
+
+      if (!isActive) return;
+
+      if (guideByEmailError) {
+        console.warn("[nav.guides] failed to check guide by email", guideByEmailError);
+      }
+
+      setHasGuideDashboard(Boolean(guideByEmail?.id));
     }
 
     async function syncPendingAvatar(userId: string, email: string, hasAvatar: boolean) {
@@ -127,14 +175,23 @@ export function Navigation() {
         const metaAvatar =
           (data.session?.user.user_metadata?.avatar_url as string | undefined) ??
           "";
+        void loadGuideStatus(userId, email);
         void loadProfile(userId).then((loadedProfile) => {
           const hasAvatar = Boolean((loadedProfile?.avatar_url ?? "").trim() || metaAvatar.trim());
           void syncPendingAvatar(userId, email, hasAvatar);
         });
       } else {
         setProfile(null);
+        setHasGuideDashboard(false);
         pendingAvatarSyncKeyRef.current = null;
       }
+    }).catch((error) => {
+      if (!isActive) return;
+      console.warn("[nav.auth] failed to get session", error);
+      setSession(null);
+      setProfile(null);
+      setHasGuideDashboard(false);
+      pendingAvatarSyncKeyRef.current = null;
     })
 
     const {
@@ -148,12 +205,14 @@ export function Navigation() {
         const metaAvatar =
           (nextSession?.user.user_metadata?.avatar_url as string | undefined) ??
           "";
+        void loadGuideStatus(userId, email);
         void loadProfile(userId).then((loadedProfile) => {
           const hasAvatar = Boolean((loadedProfile?.avatar_url ?? "").trim() || metaAvatar.trim());
           void syncPendingAvatar(userId, email, hasAvatar);
         });
       } else {
         setProfile(null);
+        setHasGuideDashboard(false);
         pendingAvatarSyncKeyRef.current = null;
       }
     })
@@ -214,6 +273,10 @@ export function Navigation() {
             <LocaleSwitcher className="hidden md:flex" />
             {session ? (
               <>
+                <NotificationsBell
+                  userId={session.user.id}
+                  className="hidden md:block"
+                />
                 <Link
                   href="/profile"
                   className="md:hidden"
@@ -247,7 +310,7 @@ export function Navigation() {
                   </Button>
                 </form>
               </>
-            ) : (
+            ) : isSessionLoaded ? (
               <>
                 <Button
                   variant="ghost"
@@ -255,13 +318,13 @@ export function Navigation() {
                   className="hidden md:flex"
                   asChild
                 >
-                  <Link href="/auth/sign-in">Sign In</Link>
+                  <Link href="/auth/sign-in">{t("signIn")}</Link>
                 </Button>
                 <Button size="sm" className="hidden md:inline-flex" asChild>
-                  <Link href="/auth/sign-up">Get Started</Link>
+                  <Link href="/auth/sign-up">{t("getStarted")}</Link>
                 </Button>
               </>
-            )}
+            ) : null}
             <Button
               variant="ghost"
               size="icon"
@@ -347,6 +410,13 @@ export function Navigation() {
                 {link.label}
               </Link>
             ))}
+            {session && isMobileMenuOpen ? (
+              <NotificationsBell
+                userId={session.user.id}
+                variant="inline"
+                onNavigate={closeMenu}
+              />
+            ) : null}
             <LocaleSwitcher size="default" className="w-full justify-between" />
           </div>
 
@@ -363,7 +433,7 @@ export function Navigation() {
                   Sign Out
                 </Button>
               </form>
-            ) : (
+            ) : isSessionLoaded ? (
               <>
                 <Button
                   variant="ghost"
@@ -372,16 +442,16 @@ export function Navigation() {
                   asChild
                 >
                   <Link href="/auth/sign-in" onClick={closeMenu}>
-                    Sign In
+                    {t("signIn")}
                   </Link>
                 </Button>
                 <Button size="lg" className="w-full" asChild>
                   <Link href="/auth/sign-up" onClick={closeMenu}>
-                    Get Started
+                    {t("getStarted")}
                   </Link>
                 </Button>
               </>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

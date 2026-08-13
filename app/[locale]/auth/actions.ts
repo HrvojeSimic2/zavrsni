@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getFileFromFormData, uploadAvatarFile } from "@/lib/supabase/storage";
+import { ensureProfile } from "@/lib/supabase/ensure-profile";
 
 type MessageType = "error" | "message";
 
@@ -73,7 +74,7 @@ export async function signInAction(formData: FormData) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
@@ -86,7 +87,47 @@ export async function signInAction(formData: FormData) {
     );
   }
 
+  if (data.user) {
+    await ensureProfile(supabase, data.user, locale);
+  }
+
   redirect(redirectTo);
+}
+
+export async function signInWithGoogleAction(formData: FormData) {
+  const locale = getString(formData, "locale") || "en";
+  const redirectTo = safePath(
+    getString(formData, "redirectTo") || `/${locale}`,
+    `/${locale}`
+  );
+
+  const configuredSiteUrl = getConfiguredSiteUrl();
+  const origin = configuredSiteUrl ?? (await getOrigin());
+  const callbackUrl = `${origin}/${locale}/auth/callback?next=${encodeURIComponent(
+    redirectTo
+  )}`;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: callbackUrl,
+      queryParams: {
+        // Always let the user pick an account instead of silently reusing one.
+        prompt: "select_account",
+      },
+    },
+  });
+
+  if (error || !data?.url) {
+    return redirectWithMessage(
+      `/${locale}/auth/sign-in`,
+      "error",
+      error?.message ?? "Could not start Google sign-in."
+    );
+  }
+
+  redirect(data.url);
 }
 
 export async function signUpAction(formData: FormData) {

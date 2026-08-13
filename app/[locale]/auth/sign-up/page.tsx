@@ -2,6 +2,7 @@ import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { SignUpForm } from "./sign-up-form";
+import { AuthDivider, GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 
 type PageProps = {
   params: { locale: string } | Promise<{ locale: string }>;
@@ -39,6 +40,12 @@ export default async function SignUpPage({ params, searchParams }: PageProps) {
             {message}
           </div>
         ) : null}
+        <GoogleSignInButton
+          locale={locale}
+          redirectTo={`/${locale}`}
+          label="Sign up with Google"
+        />
+        <AuthDivider />
         <SignUpForm locale={locale} redirectTo={`/${locale}`} />
       </CardContent>
       <CardFooter className="flex flex-col text-sm text-muted-foreground">

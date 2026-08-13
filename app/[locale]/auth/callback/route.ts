@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { ensureProfile } from "@/lib/supabase/ensure-profile";
 
 function isDebugEnabled() {
   return process.env.SUPABASE_DEBUG === "1";
@@ -46,7 +47,7 @@ export async function GET(
 
   if (code) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (error) {
       const errorUrl = new URL(`/${locale}/auth/sign-in`, req.url);
@@ -55,6 +56,10 @@ export async function GET(
         error.message || "Could not authenticate. Please try again."
       );
       return NextResponse.redirect(errorUrl);
+    }
+
+    if (data.user) {
+      await ensureProfile(supabase, data.user, locale);
     }
   }
 

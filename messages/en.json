@@ -1,12 +1,12 @@
 {
   "Home": {
-    "localExperienceBadge": "Authentic local experiences",
-    "discover": "Discover",
-    "likeA": "like a",
-    "local": "local",
-    "connectNote": "Connect with actual locals who reveal unique experiences you will not find in guidebooks.",
+    "localExperienceBadge": "Guides that fit you",
+    "discover": "Find",
+    "likeA": "a guide",
+    "local": "near you",
+    "connectNote": "LocalPath matches you with the best local guide for your location, interests, and availability — then you plan the details together.",
     "whyChooseUs": "Why LocalPath?",
-    "ctaExplore": "Explore Tours",
+    "ctaExplore": "Find Guides",
     "ctaGuide": "Become a Guide",
     "verifiedGuides": "Verified Guides",
     "trustedWorldwide": "Trusted worldwide",
@@ -21,13 +21,13 @@
     "whyImpactBody": "Support local communities directly while exploring responsibly and sustainably.",
     "howTitle": "How It Works",
     "howSubtitle": "Start your adventure in three simple steps.",
-    "howStep1Title": "Browse and Discover",
-    "howStep1Body": "Search for experiences by location, interests, or guide specialties. Filter by food tours, nature hikes, cultural walks, and more.",
+    "howStep1Title": "Find your guide",
+    "howStep1Body": "Tell us where you are and what you’re into. We’ll surface the best local guides for your vibe and timing.",
     "howStep2Title": "Connect with Guides",
-    "howStep2Body": "Read authentic reviews, check guide profiles, and message them directly to customize your perfect experience.",
-    "howStep3Title": "Experience and Explore",
-    "howStep3Body": "Meet your guide and embark on an authentic journey through hidden spots and local stories you will never forget.",
-    "howCta": "Start Exploring",
+    "howStep2Body": "Pick a guide, connect, and share your preferences. The guide helps shape a plan that fits you.",
+    "howStep3Title": "Customize together",
+    "howStep3Body": "You and your guide iron out the route, pace, stops, and special requests — no cookie-cutter tours.",
+    "howCta": "Find a guide",
     "guideBadge": "For Local Guides",
     "guideTitle": "Share Your World, Earn Income",
     "guideBody": "Turn your local knowledge into meaningful connections and income. Join guides worldwide who share their passion with travelers.",
@@ -43,27 +43,32 @@
   },
   "Navigation": {
     "brand": "LocalPath",
-    "browse": "Browse Tours",
+    "browse": "Find Guides",
     "guide": "Become a Guide",
+    "dashboard": "Guide Dashboard",
     "how": "How It Works",
     "signIn": "Sign In",
-    "getStarted": "Get Started"
+    "getStarted": "Get Started",
+    "trips": "My trips"
   },
   "HowItWorks": {
     "title": "How LocalPath Works",
     "subtitle": "Your journey to authentic local experiences in three simple steps.",
-    "step1Title": "Browse and Find",
-    "step1Body": "Search a wide range of experiences led by locals. Filter by location, interests, or guide specialties to find the perfect tour for you.",
+    "step1Title": "Find the right guide",
+    "step1Body": "Tell us where you are, what you’re into, and when you want to go. We’ll surface guides that fit.",
     "step2Title": "Connect with Guides",
-    "step2Body": "Review detailed guide profiles, read reviews from other travelers, and message guides to customize your experience to your preferences.",
-    "step3Title": "Experience and Explore",
-    "ctaButton": "Start Exploring",
-    "step3Body": "Meet your guide and embark on an unforgettable journey through hidden spots, local stories, and authentic cultures that will enrich your travel."
+    "step2Body": "Choose a guide, connect, and share preferences. The tour plan gets shaped after you match.",
+    "step3Title": "Customize together",
+    "ctaButton": "Find a guide",
+    "step3Body": "Agree the route, timing, pace, stops, and special requests directly with your guide."
   },
   "Profile": {
     "title": "Profile",
     "subtitle": "Manage your account details and profile photo.",
     "signOut": "Sign out",
+    "adminTitle": "Admin settings",
+    "adminSubtitle": "Review pending guide applications and manage verification.",
+    "adminButton": "Open admin dashboard",
     "photoTitle": "Profile photo",
     "photoSubtitle": "Used across LocalPath.",
     "memberSince": "Member since {date}",
@@ -91,5 +96,74 @@
         "uploadFailed": "We couldn't upload your photo. Please try again."
       }
     }
+  },
+  "Notifications": {
+    "title": "Notifications",
+    "open": "Open notifications",
+    "empty": "You're all caught up.",
+    "count": "{count} total",
+    "new": "New",
+    "on": "on {date}",
+    "someone": "A traveller",
+    "aTour": "a tour",
+    "request": {
+      "title": "New booking request",
+      "body": "{person} · party of {party} · {tour}"
+    },
+    "pending": {
+      "title": "Waiting for approval",
+      "body": "{guide} has not answered your request for {tour} yet"
+    },
+    "confirmed": {
+      "title": "Booking confirmed",
+      "body": "{guide} approved your request for {tour}"
+    },
+    "declined": {
+      "title": "Booking declined",
+      "body": "{guide} could not take your request for {tour}"
+    },
+    "application": {
+      "pendingTitle": "Application under review",
+      "pendingBody": "We will let you know once it is approved.",
+      "acceptedTitle": "You are approved as a guide",
+      "acceptedBody": "Your guide dashboard is ready.",
+      "rejectedTitle": "Application not approved",
+      "rejectedBody": "You can update your details and apply again."
+    },
+    "addToCalendar": "Add to calendar"
+  },
+  "Booking": {
+    "sentTitle": "Request sent",
+    "sentBody": "Your request is with {guide}. We are waiting for them to confirm the date - you can follow the status in your notifications.",
+    "sentAction": "Continue"
+  },
+  "Bookings": {
+    "title": "My trips",
+    "subtitle": "Your booking requests and confirmed tours.",
+    "upcoming": "Upcoming",
+    "past": "Past and cancelled",
+    "emptyUpcoming": "No trips booked yet. Find a guide and request a date.",
+    "emptyPast": "Nothing here yet.",
+    "browse": "Find a guide",
+    "guests": "{count, plural, one {# guest} other {# guests}}",
+    "withGuide": "with {guide}",
+    "meetingPoint": "Meeting point",
+    "addToCalendar": "Add to calendar",
+    "cancel": "Cancel booking",
+    "viewTour": "View tour",
+    "contactGuide": "Guide details",
+    "awaitingNote": "Waiting for the guide to confirm. Contact details unlock once they do.",
+    "statusPending": "Pending",
+    "statusConfirmed": "Confirmed",
+    "statusCancelled": "Cancelled",
+    "statusCompleted": "Completed",
+    "flashCancelled": "Your booking was cancelled and the spots were released.",
+    "flashAlreadyCancelled": "That booking was already cancelled.",
+    "errTooLate": "It is too late to cancel this one. Contact your guide directly.",
+    "errNotFound": "That booking could not be found.",
+    "errNotYours": "That booking is not yours.",
+    "errAlreadyDone": "That tour already happened.",
+    "errFailed": "Could not cancel the booking. Try again.",
+    "errInvalid": "Invalid request."
   }
 }
