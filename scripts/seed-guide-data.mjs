@@ -333,7 +333,7 @@ async function seedGuide(guide) {
       total_amount: rate ? Number((rate * hours).toFixed(2)) : null,
       currency: CURRENCY,
       meeting_point: offer.default_meeting_point ?? null,
-      request_note: null,
+      note: null,
     });
 
     // Most finished bookings leave a review — about the guide, not a product.

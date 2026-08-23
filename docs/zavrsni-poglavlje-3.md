@@ -2,7 +2,7 @@
 
 U ovom poglavlju opisani su alati i tehnologije korišteni pri izradi web aplikacije za posredovanje između putnika i lokalnih turističkih vodiča. Aplikacija je izrađena kao cjelovito web rješenje u kojem se poslužiteljska i klijentska logika nalaze unutar istog projekta, dok se pohrana podataka, autentikacija korisnika i pohrana datoteka oslanjaju na vanjsku uslugu. Takav pristup, poznat kao *full-stack* razvoj s jednim razvojnim okvirom, smanjuje količinu infrastrukture kojom je potrebno upravljati te omogućuje da se isti programski jezik i isti model podataka koriste na obje strane aplikacije.
 
-Odabir tehnologija vodio se trima kriterijima: podrškom za renderiranje na poslužitelju (zbog brzine prvog prikaza i indeksiranja javnih stranica s turama), tipskom sigurnošću (zbog velikog broja entiteta i stanja rezervacije) te postojanjem ugrađenog mehanizma za autorizaciju na razini zapisa u bazi podataka. U nastavku su prvo opisani razvojni alati, a zatim tehnologije od kojih je aplikacija sastavljena.
+Odabir tehnologija vodio se trima kriterijima: podrškom za renderiranje na poslužitelju (zbog brzine prvog prikaza i indeksiranja javnih profila vodiča), tipskom sigurnošću (zbog velikog broja entiteta i stanja rezervacije) te postojanjem ugrađenog mehanizma za autorizaciju na razini zapisa u bazi podataka. U nastavku su prvo opisani razvojni alati, a zatim tehnologije od kojih je aplikacija sastavljena.
 
 ## 3.1. Alati
 
@@ -12,7 +12,7 @@ Prije početka razvoja potrebno je pripremiti razvojno okruženje koje omogućuj
 
 Za pisanje programskog koda korišten je Visual Studio Code, besplatan i višeplatformski uređivač koda razvijen od strane Microsofta. Radi se o jednom od najkorištenijih alata za razvoj web aplikacija, prvenstveno zbog male potrošnje resursa u odnosu na potpuna razvojna okruženja te velikog broja dostupnih proširenja.
 
-Za razvoj ove aplikacije najvažnija je bila ugrađena podrška za TypeScript. Uređivač koristi isti jezični poslužitelj koji koristi i prevoditelj TypeScripta, što znači da su tipske pogreške vidljive već tijekom pisanja koda, a ne samo pri izgradnji projekta. Kod aplikacije s velikim brojem povezanih entiteta, poput tura, termina i rezervacija, ta mogućnost znatno smanjuje broj pogrešaka koje se otkrivaju tek pri izvođenju.
+Za razvoj ove aplikacije najvažnija je bila ugrađena podrška za TypeScript. Uređivač koristi isti jezični poslužitelj koji koristi i prevoditelj TypeScripta, što znači da su tipske pogreške vidljive već tijekom pisanja koda, a ne samo pri izgradnji projekta. Kod aplikacije s velikim brojem povezanih entiteta, poput vodiča, termina i rezervacija, ta mogućnost znatno smanjuje broj pogrešaka koje se otkrivaju tek pri izvođenju.
 
 Osim toga, korištene su i sljedeće mogućnosti uređivača:
 
@@ -29,7 +29,7 @@ Projekt sadrži i direktorij `.vscode` s postavkama specifičnim za radni prosto
 
 Git je distribuirani sustav za upravljanje verzijama koji omogućuje bilježenje svake promjene u izvornom kodu, vraćanje na prethodna stanja projekta te paralelan rad na više funkcionalnosti kroz odvojene grane (engl. *branch*). Za razliku od centraliziranih sustava, svaki lokalni repozitorij sadrži cijelu povijest projekta, pa je rad moguć i bez mrežne veze.
 
-Tijekom razvoja aplikacije Git je korišten na način da svaka zaokružena funkcionalnost predstavlja jednu ili više promjena zabilježenih u zapisu (engl. *commit*), uz opisnu poruku. Time je dobivena kronologija razvoja iz koje je vidljivo kojim su redom nastale autentikacija, upravljanje turama, rezervacije i administratorski dio aplikacije. Veće promjene razvijane su u odvojenim granama koje su nakon dovršetka spojene u glavnu granu.
+Tijekom razvoja aplikacije Git je korišten na način da svaka zaokružena funkcionalnost predstavlja jednu ili više promjena zabilježenih u zapisu (engl. *commit*), uz opisnu poruku. Time je dobivena kronologija razvoja iz koje je vidljivo kojim su redom nastale autentikacija, profili vodiča, upravljanje terminima, rezervacije i administratorski dio aplikacije. Veće promjene razvijane su u odvojenim granama koje su nakon dovršetka spojene u glavnu granu. Iz iste je povijesti vidljiv i prijelaz s prvotnog modela usmjerenog na ture na model u kojem se rezervira vrijeme samog vodiča, opisan u poglavlju 4.3.
 
 Kao udaljeni repozitorij korišten je GitHub, mrežna platforma za pohranu Git repozitorija. Osim što služi kao sigurnosna kopija projekta, GitHub je u ovom radu bitan i zato što se objava aplikacije izvodi izravno iz repozitorija, kako je opisano u poglavlju 3.1.5.
 
@@ -54,7 +54,7 @@ U datoteci `package.json` definirane su i skripte kojima se pokreću najčešće
 | `npm run supabase:start` | pokretanje lokalnog Supabase okruženja |
 | `npm run supabase:reset` | ponovna izgradnja lokalne baze i primjena migracija |
 | `npm run supabase:push` | primjena migracija na Supabase projekt u oblaku |
-| `npm run seed:guide` | unos početnih podataka o vodičima i turama |
+| `npm run seed:guide` | unos početnih podataka o vodičima, terminima i rezervacijama |
 | `npm run reservations:settle` | zatvaranje rezervacija čiji je termin prošao |
 
 *Tablica 3.1. Popis npm skripti definiranih u projektu (Autor)*
@@ -97,7 +97,7 @@ TypeScript je programski jezik razvijen od strane Microsofta koji nadograđuje J
 
 Cijela aplikacija napisana je u TypeScriptu, uz uključenu opciju `strict` u datoteci `tsconfig.json`. Ta opcija uključuje skup strožih provjera, od kojih je najvažnija `strictNullChecks`, koja zahtijeva izričitu obradu vrijednosti koje mogu biti `null` ili `undefined`. U aplikaciji u kojoj velik dio podataka dolazi iz baze, gdje su mnoga polja neobavezna, ta provjera sprječava čitav razred pogrešaka koje bi se inače pojavile tek pri izvođenju.
 
-Tipovi domenskih entiteta izdvojeni su u direktorij `lib/types`, s odvojenim datotekama za vodiča, turu i recenziju. Isti tipovi koriste se u poslužiteljskim funkcijama koje podatke dohvaćaju iz baze i u komponentama koje ih prikazuju, čime je osigurano da promjena strukture podatka odmah rezultira pogreškom na svim mjestima koja tu strukturu koriste. U datoteci `tsconfig.json` definirana je i putanja `@/*`, koja omogućuje uvoz modula relativno na korijen projekta umjesto nizom relativnih putanja.
+Tipovi domenskih entiteta izdvojeni su u direktorij `lib/types`, s odvojenim datotekama za vodiča, termin, recenziju i popis područja interesa. Isti tipovi koriste se u poslužiteljskim funkcijama koje podatke dohvaćaju iz baze i u komponentama koje ih prikazuju, čime je osigurano da promjena strukture podatka odmah rezultira pogreškom na svim mjestima koja tu strukturu koriste. U datoteci `tsconfig.json` definirana je i putanja `@/*`, koja omogućuje uvoz modula relativno na korijen projekta umjesto nizom relativnih putanja.
 
 U projektu je korištena verzija TypeScripta 5.9.
 
@@ -107,7 +107,7 @@ React je JavaScript knjižnica za izradu korisničkih sučelja, razvijena od str
 
 U aplikaciji je korištena verzija React 19, čija je najvažnija novost za ovaj rad podjela komponenata na serverske i klijentske. Serverske komponente izvode se isključivo na poslužitelju i u preglednik šalju samo rezultat renderiranja, bez pripadajućeg JavaScript koda. Klijentske komponente, označene direktivom `"use client"`, izvode se i u pregledniku te mogu koristiti stanje i reagirati na korisničke radnje.
 
-Ta podjela odredila je organizaciju sučelja u projektu. Stranice koje samo prikazuju podatke iz baze, kao što su popis tura ili javni profil vodiča, izvedene su kao serverske komponente, čime se podaci dohvaćaju bez dodatnog mrežnog zahtjeva iz preglednika. Klijentske komponente korištene su samo tamo gdje je interakcija nužna — kod filtriranja tura, otvaranja dijaloga i odabira termina u kalendaru.
+Ta podjela odredila je organizaciju sučelja u projektu. Stranice koje samo prikazuju podatke iz baze, kao što su popis vodiča ili javni profil pojedinog vodiča, izvedene su kao serverske komponente, čime se podaci dohvaćaju bez dodatnog mrežnog zahtjeva iz preglednika. Klijentske komponente korištene su samo tamo gdje je interakcija nužna — kod filtriranja vodiča, odabira termina u panelu za rezervaciju i prikaza obavijesti.
 
 React 19 uvodi i podršku za asinkrone funkcije koje se izvode na poslužitelju, a pozivaju iz obrasca u pregledniku, o čemu je više riječi u sljedećem potpoglavlju.
 
@@ -115,11 +115,11 @@ React 19 uvodi i podršku za asinkrone funkcije koje se izvode na poslužitelju,
 
 Next.js je razvojni okvir izgrađen nad Reactom koji dodaje usmjeravanje, renderiranje na poslužitelju, keširanje i poslužiteljsko izvođenje koda. Za razvoj ove aplikacije korištena je verzija 16 uz sustav usmjeravanja *App Router*.
 
-**Usmjeravanje na temelju datotečnog sustava.** U App Routeru struktura direktorija unutar direktorija `app` određuje adrese aplikacije. Datoteka `page.tsx` predstavlja stranicu, datoteka `layout.tsx` zajednički izgled za sve stranice u tom dijelu aplikacije, a datoteke `loading.tsx` i `error.tsx` stanje učitavanja i prikaz pogreške. Dinamički dijelovi adrese označavaju se uglatim zagradama u nazivu direktorija, pa tako direktorij `app/[locale]/tour/[tourID]` odgovara adresi ture za odabrani jezik. Zajednički izgled s navigacijom i podnožjem definiran je jednom, na razini jezičnog segmenta, i primjenjuje se na sve stranice unutar njega.
+**Usmjeravanje na temelju datotečnog sustava.** U App Routeru struktura direktorija unutar direktorija `app` određuje adrese aplikacije. Datoteka `page.tsx` predstavlja stranicu, datoteka `layout.tsx` zajednički izgled za sve stranice u tom dijelu aplikacije, a datoteke `loading.tsx` i `error.tsx` stanje učitavanja i prikaz pogreške. Dinamički dijelovi adrese označavaju se uglatim zagradama u nazivu direktorija, pa tako direktorij `app/[locale]/guides/[guideId]` odgovara adresi profila pojedinog vodiča za odabrani jezik. Zajednički izgled s navigacijom i podnožjem definiran je jednom, na razini jezičnog segmenta, i primjenjuje se na sve stranice unutar njega.
 
-**Serverske komponente i dohvat podataka.** U App Routeru su komponente serverske po zadanom. Zahvaljujući tome, stranica može izravno pozvati funkciju koja podatke dohvaća iz baze, bez posrednog API sloja. Poslužiteljska logika izdvojena je u direktorij `lib`, gdje se nalaze funkcije za dohvat podataka o vodičima, turama i rezervacijama, pa su same stranice ostale kratke i usredotočene na prikaz.
+**Serverske komponente i dohvat podataka.** U App Routeru su komponente serverske po zadanom. Zahvaljujući tome, stranica može izravno pozvati funkciju koja podatke dohvaća iz baze, bez posrednog API sloja. Poslužiteljska logika izdvojena je u direktorij `lib`, gdje se nalaze funkcije za dohvat podataka o vodičima, njihovim terminima i rezervacijama, pa su same stranice ostale kratke i usredotočene na prikaz.
 
-**Server Actions.** Server Actions su asinkrone funkcije označene direktivom `"use server"` koje se izvode na poslužitelju, a pozivaju se izravno iz HTML obrasca putem svojstva `action`. Njima su u aplikaciji izvedene sve radnje koje mijenjaju podatke — stvaranje i uređivanje ture, dodavanje termina, potvrda i odbijanje rezervacije te otkazivanje rezervacije od strane putnika. Prednost tog pristupa je u tome da za takve radnje nije potrebno pisati zasebne API rute niti u pregledniku ručno slati zahtjeve, a obrasci ostaju funkcionalni i prije nego se JavaScript kod izvrši u pregledniku.
+**Server Actions.** Server Actions su asinkrone funkcije označene direktivom `"use server"` koje se izvode na poslužitelju, a pozivaju se izravno iz HTML obrasca putem svojstva `action`. Njima su u aplikaciji izvedene sve radnje koje mijenjaju podatke — uređivanje profila vodiča i njegove satnice, otvaranje i uklanjanje termina, slanje zahtjeva za rezervaciju, potvrda i odbijanje zahtjeva te otkazivanje rezervacije od strane putnika. Prednost tog pristupa je u tome da za takve radnje nije potrebno pisati zasebne API rute niti u pregledniku ručno slati zahtjeve, a obrasci ostaju funkcionalni i prije nego se JavaScript kod izvrši u pregledniku.
 
 Programski isječak 3.1 prikazuje početak akcije za otkazivanje rezervacije. Vidljiva je direktiva `"use server"`, provjera ulaznih podataka opisana u poglavlju 3.2.6 te preusmjeravanje korisnika nakon izvršene radnje.
 
@@ -152,11 +152,11 @@ export async function cancelBookingAction(formData: FormData) {
 
 *Programski isječak 3.1. Početak Server Action funkcije za otkazivanje rezervacije (Autor)*
 
-**API rute.** Za slučajeve u kojima odgovor nije HTML stranica korištene su API rute, definirane datotekama `route.ts` u direktoriju `app/api`. Njima su izvedeni predaja prijave za vodiča, učitavanje profilne slike, dohvat dostupnih termina ture te generiranje datoteke s podacima o terminu za uvoz u kalendar.
+**API rute.** Za slučajeve u kojima odgovor nije HTML stranica korištene su API rute, definirane datotekama `route.ts` u direktoriju `app/api`. Takvih je slučajeva u aplikaciji troje: predaja prijave za turističkog vodiča, dohvat obavijesti koji preglednik povremeno ponavlja te generiranje datoteke s podacima o terminu za uvoz u kalendar. Sve ostale radnje koje mijenjaju podatke, uključujući i učitavanje profilne slike, izvedene su Server Action funkcijama.
 
 **Međuprogram.** Datoteka `middleware.ts` u korijenu projekta sadrži kod koji se izvodi prije obrade svakog zahtjeva. U ovoj aplikaciji on obavlja dvije radnje: određuje jezik na temelju adrese te osvježava korisničku sesiju, kako je opisano u poglavljima 3.2.5 i 3.2.7.
 
-**Optimizacija slika.** Komponenta `next/image` automatski prilagođava veličinu i format slika. Budući da se slike tura i profilne slike vodiča nalaze u Supabase Storageu, u datoteci `next.config.ts` definirani su dopušteni vanjski izvori slika, izvedeni iz adrese Supabase projekta.
+**Optimizacija slika.** Komponenta `next/image` automatski prilagođava veličinu i format slika. Budući da se profilne slike korisnika i vodiča nalaze u Supabase Storageu, u datoteci `next.config.ts` definirani su dopušteni vanjski izvori slika, izvedeni iz adrese Supabase projekta.
 
 ### 3.2.4. Tailwind CSS 4 i shadcn/ui (Radix UI)
 
@@ -168,17 +168,17 @@ Boje aplikacije definirane su u datoteci `app/globals.css` kao CSS varijable, i 
 
 **shadcn/ui** nije klasična knjižnica komponenata koja se instalira kao ovisnost, već zbirka komponenata čiji se izvorni kod kopira u projekt. Komponente se nalaze u direktoriju `components/ui` i dio su izvornog koda aplikacije, što znači da se mogu slobodno mijenjati. Konfiguracija je zapisana u datoteci `components.json`, iz koje je vidljivo da je korišten stil *new-york*, osnovna boja *neutral* te da su komponente prilagođene serverskim komponentama Reacta.
 
-Same komponente izgrađene su nad knjižnicom **Radix UI**, koja pruža neoblikovane (engl. *unstyled*) komponente s ispravno izvedenim ponašanjem — upravljanjem fokusom, podrškom za tipkovnicu i atributima za čitače zaslona. Radix time rješava dio koji je pri samostalnoj izradi najzahtjevniji i najčešće nepotpun, a Tailwind se koristi za izgled. U aplikaciji su tako izvedeni dijalozi za dodavanje ture i termina, padajući izbornici, kartice s karticama sadržaja, obavijesti i klizači za odabir cjenovnog razreda.
+Same komponente izgrađene su nad knjižnicom **Radix UI**, koja pruža neoblikovane (engl. *unstyled*) komponente s ispravno izvedenim ponašanjem — upravljanjem fokusom, podrškom za tipkovnicu i atributima za čitače zaslona. Radix time rješava dio koji je pri samostalnoj izradi najzahtjevniji i najčešće nepotpun, a Tailwind se koristi za izgled. U aplikaciji su tako izvedeni padajući izbornici za odabir područja interesa, jezika i načina sortiranja u pregledniku vodiča, potvrdni okviri, oznake polja obrazaca, prikaz profilnih slika s rezervnim inicijalima te razdjelnici sadržaja.
 
-Za ikone je korištena knjižnica `lucide-react`, a za odabir datuma `react-day-picker`, nad kojom je izgrađena komponenta kalendara za prikaz dostupnih termina.
+Za ikone je korištena knjižnica `lucide-react`. Termini se ne prikazuju kalendarom, već popisom otvorenih blokova vremena grupiranim po datumu, jer je jedinica koju putnik odabire konkretan blok, a ne dan.
 
 ### 3.2.5. Supabase – PostgreSQL, Auth, Storage
 
 Supabase je platforma koja pruža skup poslužiteljskih usluga izgrađenih oko relacijske baze podataka PostgreSQL. Za razliku od rješenja koja podatke pohranjuju u vlastitom, zatvorenom formatu, Supabase koristi standardni PostgreSQL, pa su svi podaci dostupni običnim SQL upitima. U ovoj aplikaciji korištene su tri usluge platforme: baza podataka, autentikacija i pohrana datoteka.
 
-**PostgreSQL.** Podaci aplikacije pohranjeni su u PostgreSQL bazi podataka, glavne verzije 17. Relacijski model odabran je zato što je domena aplikacije izrazito relacijska: vodič ima više tura, tura ima više termina, termin ima više rezervacija, a rezervacija je povezana s putnikom i može imati recenziju. Ograničenja stranih ključeva tu povezanost provode na razini baze, čime se sprječava nastanak nedosljednih zapisa. Struktura baze i cjelovit ER dijagram opisani su u poglavlju 4.
+**PostgreSQL.** Podaci aplikacije pohranjeni su u PostgreSQL bazi podataka, glavne verzije 17. Relacijski model odabran je zato što je domena aplikacije izrazito relacijska: vodič otvara više termina, svaki termin može biti zauzet jednom aktivnom rezervacijom, rezervacija je povezana s putnikom, a vodič ima i više recenzija. Ograničenja stranih ključeva tu povezanost provode na razini baze, čime se sprječava nastanak nedosljednih zapisa. Struktura baze i cjelovit ER dijagram opisani su u poglavlju 4.
 
-**Sigurnost na razini redova.** Najvažnija mogućnost platforme za ovaj rad je *Row Level Security* (RLS), mehanizam PostgreSQL-a kojim se pravila pristupa definiraju na razini pojedinačnog zapisa, a ne u kodu aplikacije. Za svaku tablicu definirane su politike koje određuju koje redove pojedini korisnik smije čitati ili mijenjati, a baza ta pravila primjenjuje na svaki upit. Iz migracija u projektu vidljive su, primjerice, politike koje vodiču dopuštaju čitanje i uređivanje isključivo rezervacija na vlastitim turama, a putniku čitanje isključivo vlastitih rezervacija. Prednost tog pristupa je što autorizacija ne ovisi o tome da svaki upit u kodu bude ispravno napisan.
+**Sigurnost na razini redova.** Najvažnija mogućnost platforme za ovaj rad je *Row Level Security* (RLS), mehanizam PostgreSQL-a kojim se pravila pristupa definiraju na razini pojedinačnog zapisa, a ne u kodu aplikacije. Za svaku tablicu definirane su politike koje određuju koje redove pojedini korisnik smije čitati ili mijenjati, a baza ta pravila primjenjuje na svaki upit. Iz migracija u projektu vidljive su, primjerice, politike koje vodiču dopuštaju otvaranje i uklanjanje isključivo vlastitih termina te čitanje i uređivanje isključivo rezervacija na vlastitom profilu, a putniku čitanje isključivo vlastitih rezervacija. Prednost tog pristupa je što autorizacija ne ovisi o tome da svaki upit u kodu bude ispravno napisan.
 
 Za radnje koje se moraju izvesti izvan tih pravila — kao što je administratorski pregled prijava za vodiča ili upis u tablicu vodiča nakon prihvaćanja prijave — koristi se odvojeni klijent stvoren servisnim ključem, koji zaobilazi RLS. Taj ključ nikada se ne šalje pregledniku i koristi se isključivo u poslužiteljskom kodu, nakon prethodne provjere da je korisnik administrator.
 
@@ -212,7 +212,7 @@ export async function createClient() {
 
 Budući da pristupni token ima ograničeno trajanje, u međuprogramu se pri svakom zahtjevu poziva funkcija koja sesiju osvježava i postavlja nove kolačiće, čime korisnik ostaje prijavljen tijekom dužeg korištenja aplikacije.
 
-**Supabase Storage.** Slike koje korisnici učitavaju — profilne slike i slike tura — pohranjene su uslugom Supabase Storage, koja datoteke organizira u imenovane spremnike (engl. *bucket*) i pristup njima uređuje istim mehanizmom politika kao i podatke u tablicama. U aplikaciji su korištena dva spremnika, `avatar` i `tour-images`, a njihovi nazivi i podmape definirani su varijablama okruženja s pripadajućim zadanim vrijednostima. U bazi se pohranjuje samo putanja datoteke, dok se javna adresa za prikaz izvodi u trenutku renderiranja.
+**Supabase Storage.** Slike koje korisnici učitavaju — profilne slike putnika i vodiča — pohranjene su uslugom Supabase Storage, koja datoteke organizira u imenovane spremnike (engl. *bucket*) i pristup njima uređuje istim mehanizmom politika kao i podatke u tablicama. Budući da je nositelj ponude sam vodič, a ne katalog proizvoda sa slikama, aplikacija koristi jedan spremnik, `avatar`, čiji su naziv i podmapa definirani varijablama okruženja s pripadajućim zadanim vrijednostima. U bazi se pohranjuje samo putanja datoteke, dok se javna adresa za prikaz izvodi u trenutku renderiranja.
 
 ### 3.2.6. Zod (validacija obrazaca)
 
@@ -257,7 +257,7 @@ Za višejezičnost je korištena knjižnica next-intl, prilagođena App Routeru 
 
 Odabrani je jezik dio adrese, kao prvi segment putanje — na primjer `/hr/browse` i `/en/browse`. Zbog toga je cijela aplikacija smještena u direktorij `app/[locale]`. Prednost takvog pristupa je što je svaka jezična verzija stranice dostupna na vlastitoj adresi, pa je moguće podijeliti poveznicu na određenom jeziku, a stranice mogu biti odvojeno indeksirane od strane pretraživača. Preusmjeravanje korisnika bez jezičnog segmenta u adresi obavlja međuprogram, stvoren funkcijom `createMiddleware`.
 
-Knjižnica pruža i pomoćne funkcije za usmjeravanje — `Link`, `redirect`, `usePathname` i `useRouter` — koje trenutni jezik automatski dodaju u adresu, pa ga nije potrebno navoditi pri svakoj poveznici. Osim toga, ista knjižnica koristi se i za oblikovanje datuma, vremena i novčanih vrijednosti u skladu s odabranim jezikom, što je u aplikaciji s terminima i cijenama tura jednako važno kao i prijevod samog teksta.
+Knjižnica pruža i pomoćne funkcije za usmjeravanje — `Link`, `redirect`, `usePathname` i `useRouter` — koje trenutni jezik automatski dodaju u adresu, pa ga nije potrebno navoditi pri svakoj poveznici. Osim toga, ista knjižnica koristi se i za oblikovanje datuma, vremena i novčanih vrijednosti u skladu s odabranim jezikom, što je u aplikaciji s terminima i satnicama vodiča jednako važno kao i prijevod samog teksta.
 
 U projektu je korištena verzija next-intl 4.7.
 

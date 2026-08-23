@@ -15,7 +15,7 @@ export type TravellerBooking = {
   currency: string;
   createdAt: string;
   meetingPoint: string | null;
-  requestNote: string | null;
+  note: string | null;
   guideId: string | null;
   guideName: string;
   /** Where the guide works, for context on the card. */
@@ -64,7 +64,7 @@ export async function fetchTravellerBookings(
   const { data, error } = await supabase
     .from("reservations")
     .select(
-      "id, date, start_time, end_time, duration_hours, party_size, status, total_amount, currency, created_at, meeting_point, request_note, guide:guides ( id, name, location )"
+      "id, date, start_time, end_time, duration_hours, party_size, status, total_amount, currency, created_at, meeting_point, note, guide:guides ( id, name, location )"
     )
     .ilike("customer_email", email)
     .order("date", { ascending: false })
@@ -103,7 +103,7 @@ export async function fetchTravellerBookings(
       currency: String(row.currency ?? "EUR"),
       createdAt: String(row.created_at ?? ""),
       meetingPoint: (row.meeting_point as string | null) ?? null,
-      requestNote: (row.request_note as string | null) ?? null,
+      note: (row.note as string | null) ?? null,
       guideId: guide?.id ? String(guide.id) : null,
       guideName: String(guide?.name ?? "Guide"),
       place: String(guide?.location ?? "").trim(),

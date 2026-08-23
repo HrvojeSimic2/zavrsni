@@ -159,7 +159,7 @@ export async function createGuideBookingAction(input: {
       currency: CURRENCY,
       meeting_point: guide.default_meeting_point ?? null,
       interests: interests.length > 0 ? interests : null,
-      request_note: note,
+      note,
     })
     .select("id")
     .maybeSingle();

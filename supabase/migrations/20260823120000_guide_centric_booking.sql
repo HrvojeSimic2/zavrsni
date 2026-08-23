@@ -140,13 +140,17 @@ alter table public.reservations
   add column if not exists duration_hours numeric(4, 2),
   add column if not exists hourly_rate numeric(10, 2),
   add column if not exists meeting_point text,
-  add column if not exists interests text[],
-  add column if not exists request_note text;
+  add column if not exists interests text[];
 
 comment on column public.reservations.hourly_rate is
   'The rate at the moment of booking. Kept here so a later rate change cannot rewrite history.';
 comment on column public.reservations.meeting_point is
   'Where these two actually meet. Belongs to the booking, not to a catalogue entry.';
+
+-- `note` already existed and was never written to. It is now what the traveller
+-- says when asking, rather than a second column beside it.
+comment on column public.reservations.note is
+  'What the traveller wrote when requesting: what they would like to see.';
 
 -- The tour is no longer required, or written, by the booking flow.
 alter table public.reservations alter column tour_id drop not null;
@@ -169,10 +173,13 @@ create index if not exists reservations_availability_id_idx
 alter table public.reviews
   add column if not exists guide_id uuid references public.guides (id) on delete cascade;
 
+-- reviews.tour_id is text while tours.id is uuid, so the join needs the cast.
+-- Casting the uuid to text (rather than the other way) keeps a review whose
+-- tour_id is not a well-formed uuid from breaking the whole statement.
 update public.reviews r
 set guide_id = t.guide_id
 from public.tours t
-where r.guide_id is null and r.tour_id = t.id and t.guide_id is not null;
+where r.guide_id is null and r.tour_id = t.id::text and t.guide_id is not null;
 
 create index if not exists reviews_guide_id_idx on public.reviews (guide_id);
 
