@@ -23,6 +23,7 @@ import {
   isProfileFlashMessageKey,
   PROFILE_FLASH_QUERY,
 } from "./flash";
+import { AuthFlashMessage } from "@/lib/i18n/auth-flash";
 
 type PageProps = {
   params: { locale: string } | Promise<{ locale: string }>;
@@ -100,7 +101,7 @@ export default async function ProfilePage({ params, searchParams }: PageProps) {
     const next = `/${locale}/profile`;
     const query = new URLSearchParams();
     query.set("next", next);
-    query.set("message", "Please sign in to view your profile.");
+    query.set("message", AuthFlashMessage.SignInForProfile);
     redirect(`/${locale}/auth/sign-in?${query.toString()}`);
   }
 

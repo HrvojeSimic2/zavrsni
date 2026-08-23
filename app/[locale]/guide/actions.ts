@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { AuthFlashMessage } from "@/lib/i18n/auth-flash";
+import { GuideFlashError } from "@/lib/i18n/guide-flash";
 
 const claimSchema = z.object({
   locale: z.string().min(2),
@@ -19,7 +21,7 @@ export async function claimGuideProfileAction(formData: FormData) {
 
   const parsed = claimSchema.safeParse(raw);
   if (!parsed.success) {
-    throw new Error("Invalid claim request.");
+    throw new Error(GuideFlashError.InvalidClaim);
   }
 
   const { locale, guideId } = parsed.data;
@@ -34,7 +36,7 @@ export async function claimGuideProfileAction(formData: FormData) {
   if (userError || !user) {
     const query = new URLSearchParams();
     query.set("next", nextPath);
-    query.set("message", "Please sign in to continue.");
+    query.set("message", AuthFlashMessage.SignInToContinue);
     redirect(`/${locale}/auth/sign-in?${query.toString()}`);
   }
 
@@ -46,7 +48,7 @@ export async function claimGuideProfileAction(formData: FormData) {
 
   if (guideError || !guide) {
     console.warn("[guide.claim] failed to load guide profile", guideError);
-    throw new Error("Failed to load guide profile.");
+    throw new Error(GuideFlashError.ClaimLoadFailed);
   }
 
   const normalizedUserEmail = String(user.email ?? "").trim().toLowerCase();
@@ -57,11 +59,11 @@ export async function claimGuideProfileAction(formData: FormData) {
     !normalizedGuideEmail ||
     normalizedUserEmail !== normalizedGuideEmail
   ) {
-    throw new Error("This guide profile cannot be claimed by your account.");
+    throw new Error(GuideFlashError.ClaimNotYours);
   }
 
   if (guide.user_id && guide.user_id !== user.id) {
-    throw new Error("This guide profile is already claimed.");
+    throw new Error(GuideFlashError.AlreadyClaimed);
   }
 
   if (guide.user_id === user.id) {
@@ -76,7 +78,7 @@ export async function claimGuideProfileAction(formData: FormData) {
 
   if (updateError) {
     console.warn("[guide.claim] failed to claim guide profile", updateError);
-    throw new Error("Failed to claim guide profile.");
+    throw new Error(GuideFlashError.ClaimFailed);
   }
 
   revalidatePath(`/${locale}/guide`);

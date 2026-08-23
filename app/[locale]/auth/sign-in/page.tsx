@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { signInAction } from "../actions";
 import { AuthDivider, GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { Link } from "@/i18n/routing";
@@ -5,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { resolveFlash } from "@/lib/i18n/flash";
 
 type PageProps = {
   params: { locale: string } | Promise<{ locale: string }>;
@@ -23,14 +26,22 @@ function safePath(path: string, fallback: string) {
 export default async function SignInPage({ params, searchParams }: PageProps) {
   const { locale } = await Promise.resolve(params);
   const resolvedSearchParams = await Promise.resolve(searchParams);
-  const error =
+  const tAuth = await getTranslations("Auth");
+  const t = await getTranslations("Auth.signIn");
+  const error = resolveFlash(
+    tAuth,
+    "errors",
     typeof resolvedSearchParams?.error === "string"
       ? resolvedSearchParams.error
-      : "";
-  const message =
+      : ""
+  );
+  const message = resolveFlash(
+    tAuth,
+    "messages",
     typeof resolvedSearchParams?.message === "string"
       ? resolvedSearchParams.message
-      : "";
+      : ""
+  );
   const next =
     typeof resolvedSearchParams?.next === "string"
       ? resolvedSearchParams.next
@@ -40,10 +51,8 @@ export default async function SignInPage({ params, searchParams }: PageProps) {
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
-        <CardTitle>Sign in</CardTitle>
-        <CardDescription>
-          Welcome back. Enter your email and password.
-        </CardDescription>
+        <CardTitle>{t("title")}</CardTitle>
+        <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {error ? (
@@ -66,7 +75,7 @@ export default async function SignInPage({ params, searchParams }: PageProps) {
             value={redirectTo}
           />
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t("emailLabel")}</Label>
             <Input
               id="email"
               name="email"
@@ -76,7 +85,7 @@ export default async function SignInPage({ params, searchParams }: PageProps) {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{t("passwordLabel")}</Label>
             <Input
               id="password"
               name="password"
@@ -87,19 +96,19 @@ export default async function SignInPage({ params, searchParams }: PageProps) {
           </div>
           <div className="flex items-center justify-between text-sm">
             <Link href="/auth/forgot-password" className="text-primary hover:underline">
-              Forgot password?
+              {t("forgotPassword")}
             </Link>
           </div>
           <Button type="submit" className="w-full">
-            Sign in
+            {t("submit")}
           </Button>
         </form>
       </CardContent>
       <CardFooter className="flex flex-col text-sm text-muted-foreground">
         <span>
-          New here?{" "}
+          {t("newHere")}{" "}
           <Link href="/auth/sign-up" className="text-primary hover:underline">
-            Create an account
+            {t("createAccount")}
           </Link>
         </span>
       </CardFooter>

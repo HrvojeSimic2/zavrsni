@@ -1,19 +1,21 @@
 /**
- * Seeds availability, reservations and reviews for claimed guide profiles so the
- * guide dashboard has real numbers to render.
+ * Seeds slots, bookings and reviews for claimed guide profiles so the guide
+ * dashboard and the public profile have real numbers to render.
+ *
+ * The unit is the guide: a rate, a group cap, some specialties, and blocks of
+ * open time. Nothing here creates a tour.
  *
  * Usage:
- *   node scripts/seed-guide-data.mjs                      # all claimed guides that own tours
+ *   node scripts/seed-guide-data.mjs                      # every claimed guide
  *   node scripts/seed-guide-data.mjs --guide=me@mail.com  # one guide, by email or id
  *   node scripts/seed-guide-data.mjs --days=60            # window size (default 45)
- *   node scripts/seed-guide-data.mjs --demo-tours         # also add two extra tours per guide
+ *   node scripts/seed-guide-data.mjs --keep-rate          # do not touch rates already set
  *   node scripts/seed-guide-data.mjs --clear              # remove seeded rows and exit
  *
  * Seeded rows are marked so re-running is idempotent and --clear is precise:
  *   reservations -> customer_email @SEED_EMAIL_DOMAIN
  *   reviews      -> id prefixed with "seed-"
- *   tours        -> id-independent, matched by the "[seed]" marker in description
- * Availability is rewritten for the seeded tours inside the window.
+ * Slots inside the window are rewritten, except any a real booking points at.
  *
  * Requires SUPABASE_SERVICE_ROLE_KEY: it writes through PostgREST as service role.
  */
@@ -30,9 +32,8 @@ if (!SUPABASE_URL || !SERVICE_KEY) {
   process.exit(1);
 }
 
-const SEED_EMAIL_DOMAIN = "seed.localpath.test";
+const SEED_EMAIL_DOMAIN = "seed.peregrine.test";
 const SEED_REVIEW_PREFIX = "seed-";
-const SEED_TOUR_MARKER = "[seed]";
 const CURRENCY = "EUR";
 
 const args = process.argv.slice(2);
@@ -45,7 +46,7 @@ const option = (name, fallback) => {
 const WINDOW_DAYS = Math.max(7, Math.min(Number(option("days", 45)), 180));
 const TARGET_GUIDE = option("guide", null);
 const CLEAR_ONLY = flag("clear");
-const WITH_DEMO_TOURS = flag("demo-tours");
+const KEEP_RATE = flag("keep-rate");
 
 const headers = {
   apikey: SERVICE_KEY,
@@ -112,13 +113,6 @@ function pick(random, values) {
   return values[Math.floor(random() * values.length)];
 }
 
-function parseCapacity(groupSize) {
-  const match = String(groupSize ?? "").match(/\d+/g);
-  if (!match) return 8;
-  const largest = Math.max(...match.map(Number));
-  return Number.isFinite(largest) && largest > 0 ? Math.min(largest, 20) : 8;
-}
-
 const FIRST_NAMES = [
   "Ana", "Marko", "Lena", "Tomás", "Aiko", "Noah", "Ines", "Petar",
   "Sofia", "Lukas", "Maja", "Elena", "Ivan", "Clara", "Nikola", "Hana",
@@ -132,36 +126,74 @@ const REVIEW_COMMENTS = [
   "Easily the highlight of our trip. Relaxed pace and great local tips.",
   "Knows every corner of the city and picked spots we never would have found.",
   "Warm, funny and endlessly patient with our questions. Highly recommended.",
-  "Great value and a genuinely local experience, not a tourist script.",
-  "Flexible with our schedule and adapted the route when it started raining.",
+  "Spent the afternoon with us like a friend would, not like a script.",
+  "Flexible with our schedule and changed the route when it started raining.",
   "Wonderful morning. We left with a list of places to go back to.",
   "Very well organised from the first message to the last stop.",
 ];
 
+const SPECIALTIES = ["food", "nature", "culture", "adventure", "history"];
+
+/** The blocks a real guide tends to open. */
+const SLOT_SHAPES = [
+  { start: "09:00", end: "12:00", note: "Jutarnja šetnja" },
+  { start: "10:00", end: "14:00", note: null },
+  { start: "14:00", end: "17:00", note: "Poslijepodne" },
+  { start: "17:00", end: "20:00", note: "Zalazak sunca" },
+];
+
+const MEETING_POINTS = [
+  "Kod Manduševca, ispred fontane",
+  "Ispred glavnog ulaza u katedralu",
+  "Na uglu tržnice, kod cvjećarnica",
+];
+
+function seedEmail(name, index) {
+  const slug = name
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z]+/g, ".")
+    .replace(/^\.|\.$/g, "");
+  return `${slug}.${index}@${SEED_EMAIL_DOMAIN}`;
+}
+
+function hoursBetween(start, end) {
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  return Math.round(((eh * 60 + em - (sh * 60 + sm)) / 60) * 4) / 4;
+}
+
 async function resolveGuides() {
   const guides = await select(
-    "guides?select=id,name,email,user_id&user_id=not.is.null&order=name"
+    "guides?select=id,name,email,user_id,hourly_rate,specialties,max_group_size,default_meeting_point&user_id=not.is.null&order=name"
   );
 
   if (!TARGET_GUIDE) return guides;
 
-  const needle = TARGET_GUIDE.trim().toLowerCase();
+  const needle = TARGET_GUIDE.toLowerCase();
   const match = guides.filter(
     (guide) =>
       guide.id === TARGET_GUIDE ||
       String(guide.email ?? "").toLowerCase() === needle
   );
-
-  if (match.length === 0) {
-    throw new Error(
-      `No claimed guide matches "${TARGET_GUIDE}". A guide must have user_id set (profile claimed).`
-    );
-  }
   return match;
 }
 
-async function clearSeedData(guideIds) {
+/**
+ * Removes what a previous run created. Slots are cleared for the window, but a
+ * slot a real (non-seed) booking points at is left alone: deleting it would
+ * detach somebody's actual test booking.
+ */
+async function clearSeeded(guideIds, windowStartISO, windowEndISO) {
   const idList = `(${guideIds.join(",")})`;
+
+  const seededReviews = await select(
+    `reviews?select=id&guide_id=in.${idList}&id=like.${SEED_REVIEW_PREFIX}*`
+  );
+  if (seededReviews.length > 0) {
+    await remove(`reviews?guide_id=in.${idList}&id=like.${SEED_REVIEW_PREFIX}*`);
+  }
 
   const seededReservations = await select(
     `reservations?select=id&guide_id=in.${idList}&customer_email=like.*@${SEED_EMAIL_DOMAIN}`
@@ -172,217 +204,165 @@ async function clearSeedData(guideIds) {
     );
   }
 
-  const tours = await select(`tours?select=id,description&guide_id=in.${idList}`);
-  const tourIds = tours.map((tour) => tour.id);
-  const seededTourIds = tours
-    .filter((tour) => String(tour.description ?? "").includes(SEED_TOUR_MARKER))
-    .map((tour) => tour.id);
+  const slots = await select(
+    `guide_availability?select=id&guide_id=in.${idList}&date=gte.${windowStartISO}&date=lte.${windowEndISO}`
+  );
+  const slotIds = slots.map((slot) => slot.id);
 
-  let seededReviews = [];
-  if (tourIds.length > 0) {
-    seededReviews = await select(
-      `reviews?select=id&tour_id=in.(${tourIds.join(",")})&id=like.${SEED_REVIEW_PREFIX}*`
+  let protectedIds = [];
+  if (slotIds.length > 0) {
+    const realBookings = await select(
+      `reservations?select=availability_id&availability_id=in.(${slotIds.join(",")})`
     );
-    if (seededReviews.length > 0) {
-      await remove(
-        `reviews?tour_id=in.(${tourIds.join(",")})&id=like.${SEED_REVIEW_PREFIX}*`
-      );
-    }
-    await remove(`tour_availability?tour_id=in.(${tourIds.join(",")})`);
+    protectedIds = realBookings
+      .map((row) => row.availability_id)
+      .filter(Boolean);
   }
 
-  if (seededTourIds.length > 0) {
-    await remove(`tours?id=in.(${seededTourIds.join(",")})`);
+  const deletable = slotIds.filter((id) => !protectedIds.includes(id));
+  if (deletable.length > 0) {
+    await remove(`guide_availability?id=in.(${deletable.join(",")})`);
   }
 
   return {
-    reservations: seededReservations.length,
     reviews: seededReviews.length,
-    tours: seededTourIds.length,
-    availabilityTours: tourIds.length,
+    reservations: seededReservations.length,
+    slots: deletable.length,
+    keptSlots: protectedIds.length,
   };
 }
 
-const DEMO_TOURS = [
-  {
-    title: "Skrivene ulice Gornjeg grada",
-    category: "history",
-    price: 34,
-    duration: "2-3 sata",
-    group_size: "8",
-    highlights: ["Kula Lotrščak", "Kamenita vrata", "Priče starog Zagreba"],
-  },
-  {
-    title: "Dolac market food walk",
-    category: "food",
-    price: 52,
-    duration: "3-4 sata",
-    group_size: "6",
-    highlights: ["Dolac market", "Local cheese and štrukli", "Craft beer stop"],
-  },
-];
+/** Gives the guide a rate, a cap and some specialties if they have none. */
+async function seedGuideOffer(guide, random) {
+  const update = {};
 
-async function createDemoTours(guide, existingTour) {
-  const rows = DEMO_TOURS.map((tour) => ({
-    ...tour,
-    description: `${SEED_TOUR_MARKER} Demo tour created by scripts/seed-guide-data.mjs.`,
-    location: existingTour?.location ?? "Zagreb",
-    country: existingTour?.country ?? "Hrvatska",
-    image: existingTour?.image ?? null,
-    rating: 0,
-    review_count: 0,
-    guide_id: guide.id,
-  }));
+  if (!KEEP_RATE || !guide.hourly_rate) {
+    update.hourly_rate = pick(random, [22, 28, 32, 35, 40, 45, 55]);
+  }
+  if (!guide.max_group_size || Number(guide.max_group_size) < 1) {
+    update.max_group_size = pick(random, [2, 4, 6, 8, 10]);
+  }
+  if (!Array.isArray(guide.specialties) || guide.specialties.length === 0) {
+    const shuffled = [...SPECIALTIES].sort(() => random() - 0.5);
+    update.specialties = shuffled.slice(0, 1 + Math.floor(random() * 3));
+  }
+  if (!guide.default_meeting_point) {
+    update.default_meeting_point = pick(random, MEETING_POINTS);
+  }
 
-  return insert("tours", rows);
+  if (Object.keys(update).length === 0) return guide;
+
+  await patch(`guides?id=eq.${guide.id}`, update);
+  return { ...guide, ...update };
 }
 
 async function seedGuide(guide) {
-  let tours = await select(
-    "tours?select=id,title,price,group_size,location,country,image&guide_id=eq." + guide.id
-  );
-
-  if (tours.length === 0) {
-    return { skipped: true };
-  }
-
-  if (WITH_DEMO_TOURS) {
-    const created = await createDemoTours(guide, tours[0]);
-    tours = tours.concat(created);
-  }
-
   const random = makeRandom(hashSeed(guide.id));
+  const offer = await seedGuideOffer(guide, random);
+
+  const rate = Number(offer.hourly_rate ?? 0) || null;
+  const maxGroup = Math.max(1, Number(offer.max_group_size ?? 6));
+
   const today = new Date();
-  const todayISO = toISODate(today);
+  const slotRows = [];
 
-  const availabilityRows = [];
-  const reservationRows = [];
-  const reviewRows = [];
+  // Open time on roughly every other day, in both directions: the past gives
+  // the dashboard its trailing numbers, the future gives travellers something
+  // to ask for.
+  for (let offset = -WINDOW_DAYS; offset <= WINDOW_DAYS; offset += 1) {
+    const date = addDays(today, offset);
+    const weekday = date.getDay();
+    if (weekday === 1) continue; // the guide's day off
+    if (random() > 0.55) continue;
 
-  for (const tour of tours) {
-    const capacity = parseCapacity(tour.group_size);
-    const price = Number(tour.price ?? 0);
-
-    // Future: availability with bookings layered on top.
-    for (let offset = 0; offset < WINDOW_DAYS; offset += 1) {
-      const date = addDays(today, offset);
-      const weekday = date.getDay();
-
-      // Roughly half the days are offered, weekends more often than weekdays.
-      const threshold = weekday === 0 || weekday === 6 ? 0.75 : 0.4;
-      if (random() > threshold) continue;
-
-      const dateISO = toISODate(date);
-      let booked = 0;
-      const bookingCount = random() < 0.55 ? (random() < 0.35 ? 2 : 1) : 0;
-
-      for (let i = 0; i < bookingCount; i += 1) {
-        const partySize = Math.min(
-          1 + Math.floor(random() * 3),
-          Math.max(capacity - booked, 0)
-        );
-        if (partySize <= 0) break;
-        booked += partySize;
-
-        // Dates close to today are mostly settled; further out still pending.
-        const status =
-          offset <= 3 ? "confirmed" : random() < 0.28 ? "pending" : "confirmed";
-
-        const first = pick(random, FIRST_NAMES);
-        const last = pick(random, LAST_NAMES);
-
-        reservationRows.push({
-          guide_id: guide.id,
-          tour_id: tour.id,
-          date: dateISO,
-          party_size: partySize,
-          status,
-          customer_name: `${first} ${last}`,
-          customer_email: `${first.toLowerCase()}.${i}${offset}@${SEED_EMAIL_DOMAIN}`,
-          note: "Seeded demo booking.",
-          total_amount: Number((price * partySize).toFixed(2)),
-          currency: CURRENCY,
-        });
-      }
-
-      availabilityRows.push({
-        tour_id: tour.id,
-        date: dateISO,
-        available_spots: Math.max(capacity - booked, 0),
-      });
-    }
-
-    // Past 30 days: completed and a few cancelled bookings drive trailing metrics.
-    for (let offset = 1; offset <= 30; offset += 1) {
-      if (random() > 0.45) continue;
-
-      const dateISO = toISODate(addDays(today, -offset));
-      const partySize = 1 + Math.floor(random() * 3);
-      const status = random() < 0.15 ? "cancelled" : "completed";
-      const first = pick(random, FIRST_NAMES);
-      const last = pick(random, LAST_NAMES);
-
-      reservationRows.push({
-        guide_id: guide.id,
-        tour_id: tour.id,
-        date: dateISO,
-        party_size: partySize,
-        status,
-        customer_name: `${first} ${last}`,
-        customer_email: `${first.toLowerCase()}.p${offset}@${SEED_EMAIL_DOMAIN}`,
-        note: "Seeded demo booking.",
-        total_amount: Number((price * partySize).toFixed(2)),
-        currency: CURRENCY,
-      });
-
-      // Most completed tours leave a review.
-      if (status === "completed" && random() < 0.5) {
-        reviewRows.push({
-          id: `${SEED_REVIEW_PREFIX}${tour.id.slice(0, 8)}-${offset}`,
-          tour_id: tour.id,
-          author: `${first} ${last}`,
-          // reviews.avatar is NOT NULL, so fall back to the shared placeholder.
-          avatar: "/placeholder.svg",
-          rating: random() < 0.72 ? 5 : 4,
-          date: dateISO,
-          comment: pick(random, REVIEW_COMMENTS),
-          helpful: Math.floor(random() * 12),
-        });
-      }
-    }
-  }
-
-  if (availabilityRows.length > 0) await insert("tour_availability", availabilityRows);
-  if (reservationRows.length > 0) await insert("reservations", reservationRows);
-  if (reviewRows.length > 0) await insert("reviews", reviewRows);
-
-  // Keep tours.rating / review_count consistent with the seeded reviews, since
-  // the guide rating metric and the browse listing both read from tours.
-  for (const tour of tours) {
-    const tourReviews = reviewRows.filter((review) => review.tour_id === tour.id);
-    if (tourReviews.length === 0) continue;
-
-    const average =
-      tourReviews.reduce((sum, review) => sum + review.rating, 0) / tourReviews.length;
-
-    await patch(`tours?id=eq.${tour.id}`, {
-      rating: Number(average.toFixed(2)),
-      review_count: tourReviews.length,
+    const shape = pick(random, SLOT_SHAPES);
+    slotRows.push({
+      guide_id: guide.id,
+      date: toISODate(date),
+      start_time: shape.start,
+      end_time: shape.end,
+      note: shape.note,
     });
   }
 
-  const upcoming = reservationRows.filter((row) => row.date >= todayISO);
-  const revenue = upcoming
-    .filter((row) => row.status !== "cancelled")
-    .reduce((sum, row) => sum + row.total_amount, 0);
+  // Unique on (guide_id, date, start_time), so drop same-key duplicates first.
+  const seen = new Set();
+  const uniqueSlots = slotRows.filter((row) => {
+    const key = `${row.date}:${row.start_time}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  const insertedSlots =
+    uniqueSlots.length > 0 ? await insert("guide_availability", uniqueSlots) : [];
+
+  const todayISO = toISODate(today);
+  const reservationRows = [];
+  const reviewRows = [];
+
+  for (const slot of insertedSlots) {
+    const isPast = slot.date < todayISO;
+    const roll = random();
+
+    // Past slots mostly happened; upcoming ones are a mix of asked and agreed.
+    if (isPast && roll > 0.65) continue;
+    if (!isPast && roll > 0.45) continue;
+
+    const partySize = 1 + Math.floor(random() * Math.min(maxGroup, 4));
+    const name = `${pick(random, FIRST_NAMES)} ${pick(random, LAST_NAMES)}`;
+    const hours = hoursBetween(slot.start_time.slice(0, 5), slot.end_time.slice(0, 5));
+    const status = isPast
+      ? "completed"
+      : random() > 0.45
+        ? "confirmed"
+        : "pending";
+
+    reservationRows.push({
+      guide_id: guide.id,
+      availability_id: slot.id,
+      date: slot.date,
+      start_time: slot.start_time,
+      end_time: slot.end_time,
+      duration_hours: hours,
+      hourly_rate: rate,
+      party_size: partySize,
+      status,
+      customer_name: name,
+      customer_email: seedEmail(name, reservationRows.length),
+      total_amount: rate ? Number((rate * hours).toFixed(2)) : null,
+      currency: CURRENCY,
+      meeting_point: offer.default_meeting_point ?? null,
+      request_note: null,
+    });
+
+    // Most finished bookings leave a review — about the guide, not a product.
+    if (status === "completed" && random() > 0.3) {
+      reviewRows.push({
+        id: `${SEED_REVIEW_PREFIX}${guide.id}-${slot.id}`.slice(0, 60),
+        guide_id: guide.id,
+        author: name,
+        avatar: "/placeholder-user.jpg",
+        rating: 4 + Math.round(random()),
+        date: slot.date,
+        comment: pick(random, REVIEW_COMMENTS),
+      });
+    }
+  }
+
+  if (reservationRows.length > 0) await insert("reservations", reservationRows);
+  if (reviewRows.length > 0) await insert("reviews", reviewRows);
+
+  // guides.rating / review_count are maintained by the refresh_guide_rating
+  // trigger, so there is nothing to patch here.
 
   return {
-    tours: tours.length,
-    availability: availabilityRows.length,
-    reservations: reservationRows.length,
-    upcoming: upcoming.length,
+    guide: guide.name,
+    rate,
+    maxGroup,
+    slots: insertedSlots.length,
+    bookings: reservationRows.length,
     reviews: reviewRows.length,
-    revenue,
   };
 }
 
@@ -390,40 +370,37 @@ async function main() {
   const guides = await resolveGuides();
 
   if (guides.length === 0) {
-    console.log(
+    console.error(
       "No claimed guide profiles found. Claim a guide profile first (guides.user_id must be set)."
     );
-    return;
+    process.exit(1);
   }
 
   const guideIds = guides.map((guide) => guide.id);
-  const cleared = await clearSeedData(guideIds);
+  const today = new Date();
+  const windowStartISO = toISODate(addDays(today, -WINDOW_DAYS));
+  const windowEndISO = toISODate(addDays(today, WINDOW_DAYS));
+
+  const cleared = await clearSeeded(guideIds, windowStartISO, windowEndISO);
   console.log(
-    `Cleared previous seed data: ${cleared.reservations} reservations, ${cleared.reviews} reviews, ${cleared.tours} demo tours, availability for ${cleared.availabilityTours} tours.`
+    `Cleared ${cleared.reservations} booking(s), ${cleared.reviews} review(s), ${cleared.slots} slot(s)` +
+      (cleared.keptSlots > 0
+        ? ` — kept ${cleared.keptSlots} slot(s) with real bookings on them.`
+        : ".")
   );
 
-  if (CLEAR_ONLY) {
-    console.log("--clear given, stopping here.");
-    return;
-  }
+  if (CLEAR_ONLY) return;
 
   for (const guide of guides) {
     const result = await seedGuide(guide);
-
-    if (result.skipped) {
-      console.log(`- ${guide.name}: no tours, skipped.`);
-      continue;
-    }
-
     console.log(
-      `- ${guide.name}: ${result.availability} available dates, ${result.reservations} reservations (${result.upcoming} upcoming), ${result.reviews} reviews, ${result.revenue.toFixed(2)} ${CURRENCY} booked across ${result.tours} tour(s).`
+      `${result.guide}: ${result.slots} slot(s), ${result.bookings} booking(s), ` +
+        `${result.reviews} review(s), ${result.rate ?? "no"} EUR/h, up to ${result.maxGroup} people`
     );
   }
-
-  console.log("\nDone. Open /guide to see the dashboard.");
 }
 
 main().catch((error) => {
-  console.error("\nSeeding failed:", error.message);
+  console.error(error.message ?? error);
   process.exit(1);
 });

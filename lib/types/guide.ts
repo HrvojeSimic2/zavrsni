@@ -1,12 +1,14 @@
-import type { TourCategory } from "@/lib/types/tour";
+import type { Specialty } from "@/lib/types/specialty";
 
-export type GuideInterest = TourCategory;
+/** Kept as an alias so the browse UI can keep saying "interests". */
+export type GuideInterest = Specialty;
 
 export type GuideBrowseSort =
   | "match"
   | "rating"
   | "reviews"
   | "availability"
+  | "rate"
   | "name";
 
 export type GuideBrowseItem = {
@@ -19,7 +21,10 @@ export type GuideBrowseItem = {
   interests: GuideInterest[];
   rating: number;
   reviewCount: number;
+  /** EUR per hour, or null while the guide has not published a rate. */
+  hourlyRate: number | null;
+  maxGroupSize: number;
   availableToday: boolean;
   nextAvailableDate: string | null;
+  openSlotCount: number;
 };
-

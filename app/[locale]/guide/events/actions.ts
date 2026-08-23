@@ -6,28 +6,32 @@ import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
 import { getGuideForUser } from "@/lib/guide/get-guide-for-user";
+import { AuthFlashMessage } from "@/lib/i18n/auth-flash";
+import { GuideFlashError, GuideFlashStatus } from "@/lib/i18n/guide-flash";
 
-/** Guards against one submission generating a year of rows by accident. */
+/** Guards against one submission generating a year of slots by accident. */
 const MAX_DATES_PER_SUBMIT = 90;
 
 const WEEKDAY_VALUES = ["0", "1", "2", "3", "4", "5", "6"] as const;
 
+const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
 const addSchema = z.object({
   locale: z.string().min(2),
-  tourId: z.string().uuid(),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   endDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional()
     .or(z.literal("")),
-  spots: z.coerce.number().int().min(1).max(100),
+  startTime: z.string().regex(TIME_PATTERN),
+  endTime: z.string().regex(TIME_PATTERN),
+  note: z.string().max(120).optional(),
 });
 
 const removeSchema = z.object({
   locale: z.string().min(2),
-  tourId: z.string().uuid(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  slotId: z.string().uuid(),
 });
 
 function getString(formData: FormData, key: string) {
@@ -35,15 +39,18 @@ function getString(formData: FormData, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function redirectWithError(locale: string, message: string): never {
+/** `count` fills the `{n}` placeholder of the keys that need one. */
+function redirectWithError(locale: string, key: string, count?: number): never {
   const query = new URLSearchParams();
-  query.set("error", message);
+  query.set("error", key);
+  if (count !== undefined) query.set("n", String(count));
   redirect(`/${locale}/guide/events?${query.toString()}`);
 }
 
-function redirectWithStatus(locale: string, message: string): never {
+function redirectWithStatus(locale: string, key: string, count?: number): never {
   const query = new URLSearchParams();
-  query.set("status", message);
+  query.set("status", key);
+  if (count !== undefined) query.set("n", String(count));
   redirect(`/${locale}/guide/events?${query.toString()}`);
 }
 
@@ -59,10 +66,11 @@ function eachDate(startISO: string, endISO: string): string[] {
   return dates;
 }
 
-async function requireOwnedTour(
-  locale: string,
-  tourId: string
-): Promise<{
+/**
+ * The guide's own profile, or a redirect. Ownership is the whole check now:
+ * slots hang off the guide, so there is no product to verify first.
+ */
+async function requireOwnGuide(locale: string): Promise<{
   supabase: Awaited<ReturnType<typeof createClient>>;
   guideId: string;
 }> {
@@ -75,64 +83,58 @@ async function requireOwnedTour(
   if (userError || !user) {
     const query = new URLSearchParams();
     query.set("next", `/${locale}/guide/events`);
-    query.set("message", "Please sign in to continue.");
+    query.set("message", AuthFlashMessage.SignInToContinue);
     redirect(`/${locale}/auth/sign-in?${query.toString()}`);
   }
 
   const { guide, needsClaim } = await getGuideForUser(supabase, user);
   if (!guide || needsClaim) {
-    redirectWithError(locale, "Claim your guide profile before managing dates.");
-  }
-
-  const { data: tour } = await supabase
-    .from("tours")
-    .select("id")
-    .eq("id", tourId)
-    .eq("guide_id", guide.id)
-    .maybeSingle();
-
-  if (!tour?.id) {
-    redirectWithError(locale, "That tour does not belong to you.");
+    redirectWithError(locale, GuideFlashError.ClaimBeforeSlots);
   }
 
   return { supabase, guideId: guide.id };
 }
 
 /**
- * Opens one date or a range of dates for booking.
+ * Opens one time slot, or the same slot across a range of dates.
  *
- * `spots` is the tour's total capacity for the day, not the leftover. Dates
- * that already carry bookings keep them: the stored value is capacity minus
- * what is already reserved, which is the same shape the booking flow and the
- * dashboard metrics expect.
+ * A slot is a block of the guide's day; a traveller takes the whole thing. That
+ * is why there is no capacity field here any more — the old `spots` number was
+ * only meaningful when a tour was selling seats.
+ *
+ * Existing slots at the same start time are left as they are rather than
+ * overwritten, so re-submitting a wider range cannot silently move the end time
+ * of a slot somebody has already booked.
  */
-export async function addAvailabilityAction(formData: FormData) {
+export async function addSlotsAction(formData: FormData) {
   const parsed = addSchema.safeParse({
     locale: getString(formData, "locale"),
-    tourId: getString(formData, "tourId"),
     startDate: getString(formData, "startDate"),
     endDate: getString(formData, "endDate"),
-    spots: getString(formData, "spots"),
+    startTime: getString(formData, "startTime"),
+    endTime: getString(formData, "endTime"),
+    note: getString(formData, "note"),
   });
 
   if (!parsed.success) {
     const locale = getString(formData, "locale") || "en";
-    redirectWithError(
-      locale,
-      parsed.error.issues[0]?.message ?? "Check the dates and number of spots."
-    );
+    redirectWithError(locale, GuideFlashError.CheckSlotTimes);
   }
 
-  const { locale, tourId, startDate, spots } = parsed.data;
+  const { locale, startDate, startTime, endTime } = parsed.data;
   const endDate = parsed.data.endDate || startDate;
+  const note = parsed.data.note?.trim() || null;
 
+  if (endTime <= startTime) {
+    redirectWithError(locale, GuideFlashError.EndTimeBeforeStartTime);
+  }
   if (endDate < startDate) {
-    redirectWithError(locale, "The end date cannot be before the start date.");
+    redirectWithError(locale, GuideFlashError.EndBeforeStart);
   }
 
   const today = new Date().toISOString().slice(0, 10);
   if (endDate < today) {
-    redirectWithError(locale, "Those dates are already in the past.");
+    redirectWithError(locale, GuideFlashError.DatesInPast);
   }
 
   const weekdays = new Set(
@@ -142,7 +144,7 @@ export async function addAvailabilityAction(formData: FormData) {
       .filter((value) => (WEEKDAY_VALUES as readonly string[]).includes(value))
   );
 
-  const { supabase } = await requireOwnedTour(locale, tourId);
+  const { supabase, guideId } = await requireOwnGuide(locale);
 
   const candidates = eachDate(startDate, endDate).filter((date) => {
     if (date < today) return false;
@@ -152,107 +154,102 @@ export async function addAvailabilityAction(formData: FormData) {
   });
 
   if (candidates.length === 0) {
-    redirectWithError(locale, "No dates matched that range.");
+    redirectWithError(locale, GuideFlashError.NoDatesMatched);
   }
   if (candidates.length > MAX_DATES_PER_SUBMIT) {
-    redirectWithError(
-      locale,
-      `That range covers more than ${MAX_DATES_PER_SUBMIT} dates. Split it up.`
-    );
-  }
-
-  // Spots already taken on these dates must survive a capacity change.
-  const { data: booked } = await supabase
-    .from("reservations")
-    .select("date, party_size, status")
-    .eq("tour_id", tourId)
-    .in("date", candidates)
-    .in("status", ["pending", "confirmed"]);
-
-  const bookedByDate = new Map<string, number>();
-  for (const row of (booked ?? []) as Array<Record<string, unknown>>) {
-    const date = String(row.date);
-    const partySize = Number(row.party_size ?? 0);
-    bookedByDate.set(date, (bookedByDate.get(date) ?? 0) + partySize);
+    redirectWithError(locale, GuideFlashError.RangeTooLong, MAX_DATES_PER_SUBMIT);
   }
 
   const rows = candidates.map((date) => ({
-    tour_id: tourId,
+    guide_id: guideId,
     date,
-    available_spots: Math.max(spots - (bookedByDate.get(date) ?? 0), 0),
+    start_time: startTime,
+    end_time: endTime,
+    note,
   }));
 
-  const { error } = await supabase
-    .from("tour_availability")
-    .upsert(rows, { onConflict: "tour_id,date" });
+  const { data: inserted, error } = await supabase
+    .from("guide_availability")
+    .upsert(rows, {
+      onConflict: "guide_id,date,start_time",
+      ignoreDuplicates: true,
+    })
+    .select("id");
 
   if (error) {
-    console.warn("[guide.events] failed to upsert availability", error);
+    console.warn("[guide.events] failed to insert slots", error);
     if (error.code === "42501") {
-      redirectWithError(
-        locale,
-        "Row-level security blocked this. Apply supabase/migrations/20260815090000_tour_availability_policies.sql."
-      );
+      redirectWithError(locale, GuideFlashError.SlotPolicyMissing);
     }
-    redirectWithError(locale, "Failed to save those dates.");
+    redirectWithError(locale, GuideFlashError.SaveSlotsFailed);
   }
 
   revalidatePath(`/${locale}/guide/events`);
   revalidatePath(`/${locale}/guide`);
   revalidatePath(`/${locale}/guide/schedule`);
-  revalidatePath(`/${locale}/tour/${tourId}`);
+  revalidatePath(`/${locale}/guides/${guideId}`);
 
   redirectWithStatus(
     locale,
-    `Opened ${rows.length} date${rows.length === 1 ? "" : "s"}.`
+    GuideFlashStatus.SlotsOpened,
+    inserted?.length ?? rows.length
   );
 }
 
-/** Removes a date, unless travellers are already booked on it. */
-export async function removeAvailabilityAction(formData: FormData) {
+/** Removes a slot, unless a traveller is already on it. */
+export async function removeSlotAction(formData: FormData) {
   const parsed = removeSchema.safeParse({
     locale: getString(formData, "locale"),
-    tourId: getString(formData, "tourId"),
-    date: getString(formData, "date"),
+    slotId: getString(formData, "slotId"),
   });
 
   if (!parsed.success) {
-    redirectWithError(getString(formData, "locale") || "en", "Invalid request.");
+    redirectWithError(
+      getString(formData, "locale") || "en",
+      GuideFlashError.InvalidRequest
+    );
   }
 
-  const { locale, tourId, date } = parsed.data;
-  const { supabase } = await requireOwnedTour(locale, tourId);
+  const { locale, slotId } = parsed.data;
+  const { supabase, guideId } = await requireOwnGuide(locale);
+
+  const { data: slot } = await supabase
+    .from("guide_availability")
+    .select("id")
+    .eq("id", slotId)
+    .eq("guide_id", guideId)
+    .maybeSingle();
+
+  if (!slot?.id) {
+    redirectWithError(locale, GuideFlashError.SlotNotYours);
+  }
 
   const { data: active } = await supabase
     .from("reservations")
     .select("id")
-    .eq("tour_id", tourId)
-    .eq("date", date)
+    .eq("availability_id", slotId)
     .in("status", ["pending", "confirmed"])
     .limit(1);
 
   if (active && active.length > 0) {
-    redirectWithError(
-      locale,
-      "That date has active bookings. Decline them first if you cannot run it."
-    );
+    redirectWithError(locale, GuideFlashError.SlotHasBooking);
   }
 
   const { error } = await supabase
-    .from("tour_availability")
+    .from("guide_availability")
     .delete()
-    .eq("tour_id", tourId)
-    .eq("date", date);
+    .eq("id", slotId)
+    .eq("guide_id", guideId);
 
   if (error) {
-    console.warn("[guide.events] failed to delete availability", error);
-    redirectWithError(locale, "Failed to remove that date.");
+    console.warn("[guide.events] failed to delete slot", error);
+    redirectWithError(locale, GuideFlashError.RemoveSlotFailed);
   }
 
   revalidatePath(`/${locale}/guide/events`);
   revalidatePath(`/${locale}/guide`);
   revalidatePath(`/${locale}/guide/schedule`);
-  revalidatePath(`/${locale}/tour/${tourId}`);
+  revalidatePath(`/${locale}/guides/${guideId}`);
 
-  redirectWithStatus(locale, "Date removed.");
+  redirectWithStatus(locale, GuideFlashStatus.SlotRemoved);
 }

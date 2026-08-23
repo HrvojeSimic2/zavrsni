@@ -15,6 +15,7 @@ import {
 import { formatMoney, formatScheduleDate } from "@/lib/guide/reservation-status";
 import { settleCompletedReservationsThrottled } from "@/lib/reservations/settle-completed";
 import { cancelBookingAction } from "./actions";
+import { AuthFlashMessage } from "@/lib/i18n/auth-flash";
 
 type PageProps = {
   params: { locale: string } | Promise<{ locale: string }>;
@@ -39,11 +40,11 @@ export default async function BookingsPage({ params, searchParams }: PageProps) 
   if (userError || !user) {
     const query = new URLSearchParams();
     query.set("next", `/${locale}/bookings`);
-    query.set("message", "Sign in to see your trips.");
+    query.set("message", AuthFlashMessage.SignInForTrips);
     redirect(`/${locale}/auth/sign-in?${query.toString()}`);
   }
 
-  // Promote finished tours before listing, so nothing sits as "confirmed" forever.
+  // Promote finished bookings before listing, so nothing sits as "confirmed" forever.
   await settleCompletedReservationsThrottled();
 
   const { upcoming, past } = await fetchTravellerBookings(supabase, user);
@@ -86,7 +87,7 @@ export default async function BookingsPage({ params, searchParams }: PageProps) 
   const renderBooking = (booking: TravellerBooking) => {
     const badge = statusLabel(booking.status);
     const isConfirmed = booking.status === "confirmed";
-    // Matches the action's rule: the day of the tour is already too late.
+    // Matches the action's rule: the day itself is already too late.
     const canCancel =
       booking.date > today &&
       (booking.status === "pending" || booking.status === "confirmed");
@@ -98,15 +99,23 @@ export default async function BookingsPage({ params, searchParams }: PageProps) 
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="font-medium">{booking.tourTitle}</div>
+            <div className="font-medium">
+              {t("withGuide", { guide: booking.guideName })}
+            </div>
             <div className="mt-0.5 text-sm text-muted-foreground">
               {formatScheduleDate(locale, booking.date)}
-              {booking.startTime ? ` · ${booking.startTime.slice(0, 5)}` : ""}
+              {booking.startTime && booking.endTime
+                ? ` · ${booking.startTime} – ${booking.endTime}`
+                : booking.startTime
+                  ? ` · ${booking.startTime}`
+                  : ""}
               {` · ${t("guests", { count: booking.partySize })}`}
             </div>
             <div className="text-sm text-muted-foreground">
-              {t("withGuide", { guide: booking.guideName })}
-              {booking.place ? ` · ${booking.place}` : ""}
+              {booking.durationHours
+                ? t("hours", { count: booking.durationHours })
+                : ""}
+              {booking.place ? `${booking.durationHours ? " · " : ""}${booking.place}` : ""}
             </div>
           </div>
 
@@ -135,16 +144,10 @@ export default async function BookingsPage({ params, searchParams }: PageProps) 
         ) : null}
 
         <div className="flex flex-wrap gap-2">
-          {booking.tourId ? (
-            <Button asChild size="sm" variant="outline">
-              <Link href={`/tour/${booking.tourId}`}>{t("viewTour")}</Link>
-            </Button>
-          ) : null}
-
           {isConfirmed ? (
             <>
               <Button asChild size="sm" variant="outline">
-                <a href={`/api/reservations/${booking.id}/calendar`}>
+                <a href={`/api/reservations/${booking.id}/calendar?locale=${locale}`}>
                   <CalendarPlus className="size-4" />
                   {t("addToCalendar")}
                 </a>

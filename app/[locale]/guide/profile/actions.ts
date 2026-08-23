@@ -7,11 +7,14 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getGuideForUser } from "@/lib/guide/get-guide-for-user";
 import { getFileFromFormData, uploadAvatarFile } from "@/lib/supabase/storage";
+import { AuthFlashMessage } from "@/lib/i18n/auth-flash";
+import { GuideFlashError } from "@/lib/i18n/guide-flash";
+import { toSpecialties } from "@/lib/types/specialty";
 
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 
 const profileSchema = z.object({
-  name: z.string().trim().min(2, "Name must be at least 2 characters.").max(80),
+  name: z.string().trim().min(2, GuideFlashError.NameTooShort).max(80),
   headline: z.string().trim().max(120).optional(),
   bio: z.string().trim().max(2000).optional(),
   location: z.string().trim().max(120).optional(),
@@ -19,6 +22,9 @@ const profileSchema = z.object({
   yearsExperience: z.string().trim().optional(),
   website: z.string().trim().max(200).optional(),
   phone: z.string().trim().max(40).optional(),
+  hourlyRate: z.string().trim().optional(),
+  maxGroupSize: z.string().trim().optional(),
+  defaultMeetingPoint: z.string().trim().max(200).optional(),
 });
 
 function getString(formData: FormData, key: string) {
@@ -57,12 +63,15 @@ export async function updateGuideProfileAction(formData: FormData) {
     yearsExperience: getString(formData, "yearsExperience"),
     website: getString(formData, "website"),
     phone: getString(formData, "phone"),
+    hourlyRate: getString(formData, "hourlyRate"),
+    maxGroupSize: getString(formData, "maxGroupSize"),
+    defaultMeetingPoint: getString(formData, "defaultMeetingPoint"),
   });
 
   if (!parsed.success) {
     redirectWithError(
       locale,
-      parsed.error.issues[0]?.message ?? "Please check the form and try again."
+      parsed.error.issues[0]?.message ?? GuideFlashError.CheckForm
     );
   }
 
@@ -75,21 +84,18 @@ export async function updateGuideProfileAction(formData: FormData) {
   if (userError || !user) {
     const query = new URLSearchParams();
     query.set("next", `/${locale}/guide/profile`);
-    query.set("message", "Please sign in to continue.");
+    query.set("message", AuthFlashMessage.SignInToContinue);
     redirect(`/${locale}/auth/sign-in?${query.toString()}`);
   }
 
   const { guide, needsClaim } = await getGuideForUser(supabase, user);
 
   if (!guide) {
-    redirectWithError(locale, "You do not have a guide profile yet.");
+    redirectWithError(locale, GuideFlashError.NoGuideProfile);
   }
 
   if (needsClaim) {
-    redirectWithError(
-      locale,
-      "Claim your guide profile before editing it."
-    );
+    redirectWithError(locale, GuideFlashError.ClaimBeforeEditing);
   }
 
   const years = parsed.data.yearsExperience;
@@ -97,26 +103,47 @@ export async function updateGuideProfileAction(formData: FormData) {
   if (years) {
     const numeric = Number(years);
     if (!Number.isFinite(numeric) || numeric < 0 || numeric > 80) {
-      redirectWithError(locale, "Years of experience must be between 0 and 80.");
+      redirectWithError(locale, GuideFlashError.YearsRange);
     }
     yearsExperience = Math.round(numeric);
   }
+
+  // An empty rate is a deliberate state: "ask me". It is not zero.
+  let hourlyRate: number | null = null;
+  if (parsed.data.hourlyRate) {
+    const numeric = Number(parsed.data.hourlyRate.replace(",", "."));
+    if (!Number.isFinite(numeric) || numeric < 0 || numeric > 10000) {
+      redirectWithError(locale, GuideFlashError.RateInvalid);
+    }
+    hourlyRate = Math.round(numeric * 100) / 100;
+  }
+
+  let maxGroupSize = 6;
+  if (parsed.data.maxGroupSize) {
+    const numeric = Number(parsed.data.maxGroupSize);
+    if (!Number.isFinite(numeric) || numeric < 1 || numeric > 100) {
+      redirectWithError(locale, GuideFlashError.GroupSizeInvalid);
+    }
+    maxGroupSize = Math.round(numeric);
+  }
+
+  const specialties = toSpecialties(formData.getAll("specialties").map(String));
 
   let avatarUrl: string | undefined;
   const photo = getFileFromFormData(formData, "photo");
 
   if (photo) {
     if (!photo.type.startsWith("image/")) {
-      redirectWithError(locale, "Profile photo must be an image.");
+      redirectWithError(locale, GuideFlashError.PhotoMustBeImage);
     }
     if (photo.size > MAX_PHOTO_BYTES) {
-      redirectWithError(locale, "Profile photo must be 5MB or smaller.");
+      redirectWithError(locale, GuideFlashError.PhotoTooLarge);
     }
 
     const upload = await uploadAvatarFile(supabase, user.id, photo);
     if (upload.error || !upload.publicUrl) {
       console.warn("[guide.profile] failed to upload photo", upload.error);
-      redirectWithError(locale, "Failed to upload the profile photo.");
+      redirectWithError(locale, GuideFlashError.PhotoUploadFailed);
     }
 
     // Bust the CDN cache: the object key is stable per user.
@@ -134,6 +161,10 @@ export async function updateGuideProfileAction(formData: FormData) {
       years_experience: yearsExperience,
       website: normalizeWebsite(parsed.data.website ?? ""),
       phone: parsed.data.phone || null,
+      hourly_rate: hourlyRate,
+      max_group_size: maxGroupSize,
+      default_meeting_point: parsed.data.defaultMeetingPoint || null,
+      specialties,
       ...(avatarUrl ? { avatar: avatarUrl } : {}),
     })
     .eq("id", guide.id)
@@ -141,7 +172,7 @@ export async function updateGuideProfileAction(formData: FormData) {
 
   if (updateError) {
     console.warn("[guide.profile] failed to update guide profile", updateError);
-    redirectWithError(locale, "Failed to save your profile. Please try again.");
+    redirectWithError(locale, GuideFlashError.ProfileSaveFailed);
   }
 
   revalidatePath(`/${locale}/guide/profile`);

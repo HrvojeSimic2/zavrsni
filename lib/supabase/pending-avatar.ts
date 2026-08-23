@@ -7,7 +7,7 @@ type PendingAvatarRecord = {
   lastModified: number;
 };
 
-const DB_NAME = "localpath";
+const DB_NAME = "peregrine";
 const DB_VERSION = 1;
 const STORE_NAME = "pending_avatars";
 

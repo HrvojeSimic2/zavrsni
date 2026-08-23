@@ -1,89 +1,107 @@
-import type { GuideEvent, GuideReservation } from "@/lib/guide/guide-dashboard-data";
+import type { GuideReservation, GuideSlot } from "@/lib/guide/guide-dashboard-data";
 
 export type GuideScheduleEntry = {
-  tourId: string | null;
-  tourTitle: string;
-  availableSpots: number | null;
+  slotId: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  durationHours: number | null;
+  note: string | null;
   reservations: GuideReservation[];
   bookedGuests: number;
+  /** True while nobody holds this block. */
+  open: boolean;
 };
 
 export type GuideScheduleDay = {
   date: string;
   entries: GuideScheduleEntry[];
   bookedGuests: number;
-  availableSpots: number;
+  openSlots: number;
   reservationCount: number;
   hasPending: boolean;
 };
 
 /**
- * Merges availability rows and reservations into one day-by-day schedule.
+ * Merges opened slots and reservations into one day-by-day schedule.
  *
- * A day appears if it has availability, reservations, or both; within a day the
- * two are joined per tour so a guide sees "who is booked" next to "what is
- * still open" instead of two disconnected lists.
+ * A day appears if it has a slot, a reservation, or both; within a day the two
+ * are joined per slot, so a guide reads their calendar as "this block is free,
+ * this block is Ana at 14:00" instead of two disconnected lists.
+ *
+ * Reservations made before slots existed carry no `slotId`; they still show up,
+ * keyed by their own time, rather than silently vanishing from the schedule.
  */
 export function buildGuideSchedule(
-  events: GuideEvent[],
+  slots: GuideSlot[],
   reservations: GuideReservation[]
 ): GuideScheduleDay[] {
   const byDate = new Map<string, Map<string, GuideScheduleEntry>>();
 
-  const entryFor = (date: string, tourId: string | null, tourTitle: string) => {
-    const entriesByTour = byDate.get(date) ?? new Map<string, GuideScheduleEntry>();
-    byDate.set(date, entriesByTour);
+  const entryFor = (
+    date: string,
+    key: string,
+    seed: Omit<GuideScheduleEntry, "reservations" | "bookedGuests">
+  ) => {
+    const entries = byDate.get(date) ?? new Map<string, GuideScheduleEntry>();
+    byDate.set(date, entries);
 
-    const key = tourId ?? `untitled:${tourTitle}`;
-    const existing = entriesByTour.get(key);
+    const existing = entries.get(key);
     if (existing) return existing;
 
     const created: GuideScheduleEntry = {
-      tourId,
-      tourTitle,
-      availableSpots: null,
+      ...seed,
       reservations: [],
       bookedGuests: 0,
     };
-    entriesByTour.set(key, created);
+    entries.set(key, created);
     return created;
   };
 
-  for (const event of events) {
-    const entry = entryFor(event.date, event.tourId, event.tourTitle);
-    entry.availableSpots = (entry.availableSpots ?? 0) + event.availableSpots;
+  for (const slot of slots) {
+    entryFor(slot.date, slot.id, {
+      slotId: slot.id,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      durationHours: slot.durationHours,
+      note: slot.note,
+      open: !slot.booked,
+    });
   }
 
   for (const reservation of reservations) {
     if (reservation.status === "cancelled") continue;
-    const entry = entryFor(
-      reservation.date,
-      reservation.tourId,
-      reservation.tourTitle
-    );
+
+    const key = reservation.slotId ?? `legacy:${reservation.startTime ?? "—"}`;
+    const entry = entryFor(reservation.date, key, {
+      slotId: reservation.slotId,
+      startTime: reservation.startTime,
+      endTime: reservation.endTime,
+      durationHours: reservation.durationHours,
+      note: null,
+      open: false,
+    });
+
+    entry.open = false;
     entry.reservations.push(reservation);
     entry.bookedGuests += reservation.partySize;
   }
 
   return Array.from(byDate.entries())
-    .map(([date, entriesByTour]) => {
-      const entries = Array.from(entriesByTour.values()).sort((a, b) =>
-        a.tourTitle.localeCompare(b.tourTitle)
+    .map(([date, entries]) => {
+      const ordered = Array.from(entries.values()).sort((a, b) =>
+        String(a.startTime ?? "").localeCompare(String(b.startTime ?? ""))
       );
 
       return {
         date,
-        entries,
-        bookedGuests: entries.reduce((sum, entry) => sum + entry.bookedGuests, 0),
-        availableSpots: entries.reduce(
-          (sum, entry) => sum + (entry.availableSpots ?? 0),
-          0
-        ),
-        reservationCount: entries.reduce(
+        entries: ordered,
+        bookedGuests: ordered.reduce((sum, entry) => sum + entry.bookedGuests, 0),
+        openSlots: ordered.filter((entry) => entry.open).length,
+        reservationCount: ordered.reduce(
           (sum, entry) => sum + entry.reservations.length,
           0
         ),
-        hasPending: entries.some((entry) =>
+        hasPending: ordered.some((entry) =>
           entry.reservations.some((reservation) => reservation.status === "pending")
         ),
       };

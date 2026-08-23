@@ -2,8 +2,10 @@
 
 import { Link } from "@/i18n/routing";
 import { MapPin, Facebook, Instagram, Twitter } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export function Footer() {
+  const t = useTranslations("Footer");
   const year = new Date().getFullYear();
 
   return (
@@ -15,11 +17,10 @@ export function Footer() {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
                 <MapPin className="h-5 w-5 text-primary-foreground" />
               </div>
-              <span className="text-lg font-semibold">LocalPath</span>
+              <span className="text-lg font-semibold">Peregrine</span>
             </div>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Matching travelers with the right local guides for fully customizable
-              experiences.
+              {t("tagline")}
             </p>
             <div className="flex gap-3">
               <Link
@@ -47,14 +48,14 @@ export function Footer() {
           </div>
 
           <div>
-            <h3 className="font-semibold mb-4">Explore</h3>
+            <h3 className="font-semibold mb-4">{t("exploreTitle")}</h3>
             <ul className="space-y-2 text-sm">
               <li>
                 <Link
                   href="/browse"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Find Guides
+                  {t("exploreFind")}
                 </Link>
               </li>
               <li>
@@ -62,7 +63,7 @@ export function Footer() {
                   href="/browse?available=today"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Available Today
+                  {t("exploreAvailable")}
                 </Link>
               </li>
               <li>
@@ -70,7 +71,7 @@ export function Footer() {
                   href="/browse?interest=food"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Food Lovers
+                  {t("exploreFood")}
                 </Link>
               </li>
               <li>
@@ -78,21 +79,21 @@ export function Footer() {
                   href="/browse?interest=culture"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Culture & Stories
+                  {t("exploreCulture")}
                 </Link>
               </li>
             </ul>
           </div>
 
           <div>
-            <h3 className="font-semibold mb-4">For Guides</h3>
+            <h3 className="font-semibold mb-4">{t("guidesTitle")}</h3>
             <ul className="space-y-2 text-sm">
               <li>
                 <Link
                   href="/become-guide"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Become a Guide
+                  {t("guidesBecome")}
                 </Link>
               </li>
               <li>
@@ -100,7 +101,7 @@ export function Footer() {
                   href="#"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Guide Resources
+                  {t("guidesResources")}
                 </Link>
               </li>
               <li>
@@ -108,7 +109,7 @@ export function Footer() {
                   href="#"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Success Stories
+                  {t("guidesStories")}
                 </Link>
               </li>
               <li>
@@ -116,21 +117,21 @@ export function Footer() {
                   href="#"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Community
+                  {t("guidesCommunity")}
                 </Link>
               </li>
             </ul>
           </div>
 
           <div>
-            <h3 className="font-semibold mb-4">Support</h3>
+            <h3 className="font-semibold mb-4">{t("supportTitle")}</h3>
             <ul className="space-y-2 text-sm">
               <li>
                 <Link
                   href="#"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Help Center
+                  {t("supportHelp")}
                 </Link>
               </li>
               <li>
@@ -138,7 +139,7 @@ export function Footer() {
                   href="#"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Safety Guidelines
+                  {t("supportSafety")}
                 </Link>
               </li>
               <li>
@@ -146,7 +147,7 @@ export function Footer() {
                   href="#"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Terms of Service
+                  {t("supportTerms")}
                 </Link>
               </li>
               <li>
@@ -154,7 +155,7 @@ export function Footer() {
                   href="#"
                   className="text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Privacy Policy
+                  {t("supportPrivacy")}
                 </Link>
               </li>
             </ul>
@@ -162,10 +163,9 @@ export function Footer() {
         </div>
 
         <div className="mt-8 pt-8 border-t text-center text-sm text-muted-foreground">
-          <p>© {year} LocalPath. All rights reserved.</p>
+          <p>{t("rights", { year })}</p>
         </div>
       </div>
     </footer>
   );
 }
-

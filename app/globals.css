@@ -17,8 +17,16 @@
   --popover: oklch(0.995 0.003 265);
   --popover-foreground: oklch(0.42 0.06 265);
 
-  --primary: oklch(0.625 0.1 265); /* Wisteria Blue #7796CB - professional primary */
+  /* Wisteria Blue #7796CB deepened to L=0.55: at its original 0.625 lightness,
+     white button text only reached 3.5:1. Same hue, same family, now WCAG AA. */
+  --primary: oklch(0.55 0.11 265);
   --primary-foreground: oklch(0.99 0.003 265);
+
+  /* Dusty Grape #576490 - the palette's darkest tone. Wisteria is too light to
+     carry small accent text or white body copy at 4.5:1, so anything that needs
+     real contrast (eyebrow labels, the guide CTA band) uses this instead. */
+  --brand-deep: oklch(0.42 0.06 265);
+  --brand-deep-foreground: oklch(0.99 0.003 265);
 
   --secondary: oklch(0.77 0.09 265); /* Baby Blue Ice #A3BCF9 - softer accent */
   --secondary-foreground: oklch(0.42 0.06 265);
@@ -34,7 +42,7 @@
 
   --border: oklch(0.82 0.015 265); /* Pale Slate for borders */
   --input: oklch(0.82 0.015 265);
-  --ring: oklch(0.625 0.1 265);
+  --ring: oklch(0.55 0.11 265);
 
   --chart-1: oklch(0.625 0.1 265); /* Wisteria Blue #7796CB */
   --chart-2: oklch(0.77 0.09 265); /* Baby Blue Ice #A3BCF9 */
@@ -46,12 +54,12 @@
 
   --sidebar: oklch(0.98 0.005 265);
   --sidebar-foreground: oklch(0.42 0.06 265);
-  --sidebar-primary: oklch(0.625 0.1 265);
+  --sidebar-primary: oklch(0.55 0.11 265);
   --sidebar-primary-foreground: oklch(0.99 0.003 265);
   --sidebar-accent: oklch(0.86 0.04 265);
   --sidebar-accent-foreground: oklch(0.42 0.06 265);
   --sidebar-border: oklch(0.82 0.015 265);
-  --sidebar-ring: oklch(0.625 0.1 265);
+  --sidebar-ring: oklch(0.55 0.11 265);
 }
 
 .dark {
@@ -67,6 +75,10 @@
 
   --primary: oklch(0.77 0.09 265); /* Baby Blue Ice for dark mode primary */
   --primary-foreground: oklch(0.22 0.04 265);
+
+  /* Inverted for dark mode: a light tone carrying dark text. */
+  --brand-deep: oklch(0.86 0.04 265);
+  --brand-deep-foreground: oklch(0.22 0.04 265);
 
   --secondary: oklch(0.625 0.1 265); /* Wisteria in dark mode */
   --secondary-foreground: oklch(0.86 0.04 265);
@@ -111,6 +123,8 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-brand-deep: var(--brand-deep);
+  --color-brand-deep-foreground: var(--brand-deep-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -149,7 +163,19 @@
     @apply bg-background text-foreground;
   }
   .container {
+    max-width: 88rem;
     margin-inline: auto;
     padding-inline: clamp(1.5rem, 4vw, 5rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

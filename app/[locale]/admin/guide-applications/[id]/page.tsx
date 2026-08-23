@@ -7,6 +7,7 @@ import { Link } from "@/i18n/routing";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireAdminUser } from "@/lib/auth/require-admin";
 import { reviewGuideApplicationAction } from "./actions";
+import { getTranslations } from "next-intl/server";
 
 type PageProps = {
   params:
@@ -32,21 +33,20 @@ type ApplicationRow = {
   review_note: string | null;
 };
 
-function statusBadge(status: ApplicationRow["status"]) {
+function statusVariant(status: ApplicationRow["status"]) {
   switch (status) {
-    case "pending":
-      return <Badge variant="secondary">Pending</Badge>;
-    case "accepted":
-      return <Badge>Accepted</Badge>;
-    case "accepted_verified":
-      return <Badge>Accepted (Verified)</Badge>;
     case "declined":
-      return <Badge variant="destructive">Declined</Badge>;
+      return "destructive" as const;
+    case "pending":
+      return "secondary" as const;
+    default:
+      return "default" as const;
   }
 }
 
 export default async function GuideApplicationDetailPage({ params }: PageProps) {
   const { locale, id } = await Promise.resolve(params);
+  const t = await getTranslations("Admin");
   const nextPath = `/${locale}/admin/guide-applications/${id}`;
   await requireAdminUser(locale, nextPath);
 
@@ -65,13 +65,11 @@ export default async function GuideApplicationDetailPage({ params }: PageProps) 
     return (
       <PageShell variant="contained" contentClassName="max-w-4xl space-y-6">
         <div className="space-y-2">
-          <h1 className="text-2xl font-semibold">Application not found</h1>
-          <p className="text-muted-foreground">
-            The application may have been removed or you may not have access.
-          </p>
+          <h1 className="text-2xl font-semibold">{t("notFoundTitle")}</h1>
+          <p className="text-muted-foreground">{t("notFoundBody")}</p>
         </div>
         <Button asChild variant="outline">
-          <Link href="/admin/guide-applications">Back to list</Link>
+          <Link href="/admin/guide-applications">{t("backToList")}</Link>
         </Button>
       </PageShell>
     );
@@ -88,7 +86,7 @@ export default async function GuideApplicationDetailPage({ params }: PageProps) 
         <div className="space-y-1">
           <div className="text-sm text-muted-foreground">
             <Link href="/admin/guide-applications" className="hover:underline">
-              Guide Applications
+              {t("listTitle")}
             </Link>{" "}
             / {app.first_name} {app.last_name}
           </div>
@@ -97,31 +95,38 @@ export default async function GuideApplicationDetailPage({ params }: PageProps) 
           </h1>
           <div className="text-sm text-muted-foreground">{createdAt}</div>
         </div>
-        <div className="flex items-center gap-2">{statusBadge(app.status)}</div>
+        <div className="flex items-center gap-2">
+          <Badge variant={statusVariant(app.status)}>
+            {t(`status.${app.status}`)}
+          </Badge>
+        </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Applicant details</CardTitle>
+          <CardTitle>{t("detailsTitle")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           <div>
-            <span className="text-muted-foreground">Email:</span> {app.email}
+            <span className="text-muted-foreground">{t("emailLabel")}</span>{" "}
+            {app.email}
           </div>
           <div>
-            <span className="text-muted-foreground">Phone:</span> {app.phone}
+            <span className="text-muted-foreground">{t("phoneLabel")}</span>{" "}
+            {app.phone}
           </div>
           <div>
-            <span className="text-muted-foreground">Location:</span>{" "}
+            <span className="text-muted-foreground">{t("locationLabel")}</span>{" "}
             {app.location}
           </div>
           <div>
-            <span className="text-muted-foreground">Languages:</span>{" "}
+            <span className="text-muted-foreground">{t("languagesLabel")}</span>{" "}
             {app.languages}
           </div>
           {app.locale ? (
             <div>
-              <span className="text-muted-foreground">Locale:</span> {app.locale}
+              <span className="text-muted-foreground">{t("localeLabel")}</span>{" "}
+              {app.locale}
             </div>
           ) : null}
         </CardContent>
@@ -130,7 +135,7 @@ export default async function GuideApplicationDetailPage({ params }: PageProps) 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Experience</CardTitle>
+            <CardTitle>{t("experienceTitle")}</CardTitle>
           </CardHeader>
           <CardContent className="text-sm whitespace-pre-wrap">
             {app.experience}
@@ -138,7 +143,7 @@ export default async function GuideApplicationDetailPage({ params }: PageProps) 
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Tour ideas</CardTitle>
+            <CardTitle>{t("tourIdeasTitle")}</CardTitle>
           </CardHeader>
           <CardContent className="text-sm whitespace-pre-wrap">
             {app.tour_ideas}
@@ -148,12 +153,12 @@ export default async function GuideApplicationDetailPage({ params }: PageProps) 
 
       <Card>
         <CardHeader>
-          <CardTitle>Decision</CardTitle>
+          <CardTitle>{t("decisionTitle")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {reviewedAt ? (
             <div className="text-sm text-muted-foreground">
-              Last reviewed: {reviewedAt}
+              {t("lastReviewed", { date: reviewedAt })}
             </div>
           ) : null}
 
@@ -162,18 +167,18 @@ export default async function GuideApplicationDetailPage({ params }: PageProps) 
             <input type="hidden" name="applicationId" value={app.id} />
 
             <div className="space-y-2">
-              <div className="text-sm font-medium">Internal note (optional)</div>
+              <div className="text-sm font-medium">{t("noteLabel")}</div>
               <Textarea
                 name="note"
                 defaultValue={app.review_note ?? ""}
-                placeholder="Add context for the team (not visible to the applicant)"
+                placeholder={t("notePlaceholder")}
                 rows={3}
               />
             </div>
 
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button type="submit" name="decision" value="accepted">
-                Accept
+                {t("accept")}
               </Button>
               <Button
                 type="submit"
@@ -181,7 +186,7 @@ export default async function GuideApplicationDetailPage({ params }: PageProps) 
                 value="accepted_verified"
                 variant="secondary"
               >
-                Accept as verified account
+                {t("acceptVerified")}
               </Button>
               <Button
                 type="submit"
@@ -189,7 +194,7 @@ export default async function GuideApplicationDetailPage({ params }: PageProps) 
                 value="declined"
                 variant="destructive"
               >
-                Decline
+                {t("decline")}
               </Button>
             </div>
           </form>

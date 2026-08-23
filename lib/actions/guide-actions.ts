@@ -6,6 +6,7 @@ import type {
   GuideInterest,
 } from "@/lib/types/guide";
 import { fetchGuidesBrowseItems } from "@/lib/services/guide-service";
+import { isSpecialty } from "@/lib/types/specialty";
 
 export type BrowseGuidesFiltersInput = {
   q?: string | null;
@@ -14,6 +15,7 @@ export type BrowseGuidesFiltersInput = {
   language?: string | null;
   available?: string | null;
   verified?: string | null;
+  maxRate?: string | null;
   sort?: string | null;
   page?: string | null;
 };
@@ -25,6 +27,8 @@ export type BrowseGuidesFilters = {
   language: "all" | string;
   available: "any" | "today";
   verified: boolean;
+  /** Ceiling in EUR per hour, or null for no ceiling. */
+  maxRate: number | null;
   sort: GuideBrowseSort;
 };
 
@@ -35,16 +39,13 @@ function normalizeText(value: string | null | undefined, maxLength = 120) {
 function normalizeInterest(value: string | null | undefined): "all" | GuideInterest {
   const normalized = normalizeText(value, 32).toLowerCase();
   if (!normalized || normalized === "all") return "all";
-  if (
-    normalized === "food" ||
-    normalized === "nature" ||
-    normalized === "culture" ||
-    normalized === "adventure" ||
-    normalized === "history"
-  ) {
-    return normalized;
-  }
-  return "all";
+  return isSpecialty(normalized) ? normalized : "all";
+}
+
+function normalizeMaxRate(value: string | null | undefined): number | null {
+  const parsed = Number.parseFloat(normalizeText(value, 16));
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.min(parsed, 10000);
 }
 
 function normalizeSort(value: string | null | undefined): GuideBrowseSort {
@@ -52,6 +53,7 @@ function normalizeSort(value: string | null | undefined): GuideBrowseSort {
   if (normalized === "rating") return "rating";
   if (normalized === "reviews") return "reviews";
   if (normalized === "availability") return "availability";
+  if (normalized === "rate") return "rate";
   if (normalized === "name") return "name";
   return "match";
 }
@@ -160,6 +162,15 @@ function applyFilters(guides: GuideBrowseItem[], filters: BrowseGuidesFilters) {
     filtered = filtered.filter((guide) => guide.verified);
   }
 
+  // A guide who has not published a rate is not "too expensive", so they stay
+  // in the results: the price is simply still to be agreed.
+  if (filters.maxRate !== null) {
+    const ceiling = filters.maxRate;
+    filtered = filtered.filter(
+      (guide) => guide.hourlyRate === null || guide.hourlyRate <= ceiling
+    );
+  }
+
   const sorted = [...filtered];
 
   if (filters.sort === "match") {
@@ -173,6 +184,13 @@ function applyFilters(guides: GuideBrowseItem[], filters: BrowseGuidesFilters) {
       const aKey = a.availableToday ? "0000-00-00" : a.nextAvailableDate ?? "9999-99-99";
       const bKey = b.availableToday ? "0000-00-00" : b.nextAvailableDate ?? "9999-99-99";
       return aKey.localeCompare(bKey);
+    });
+  } else if (filters.sort === "rate") {
+    // Cheapest first, with unpublished rates last rather than treated as free.
+    sorted.sort((a, b) => {
+      const aKey = a.hourlyRate ?? Number.POSITIVE_INFINITY;
+      const bKey = b.hourlyRate ?? Number.POSITIVE_INFINITY;
+      return aKey - bKey;
     });
   } else if (filters.sort === "name") {
     sorted.sort((a, b) => a.name.localeCompare(b.name));
@@ -224,6 +242,7 @@ export async function getBrowseGuidesData(
     language: canonicalLanguage,
     available: normalizeAvailable(input.available),
     verified: normalizeVerified(input.verified),
+    maxRate: normalizeMaxRate(input.maxRate),
     sort: normalizeSort(input.sort),
   };
 
@@ -255,7 +274,16 @@ export async function getBrowseGuidesData(
 }
 
 export async function getHomepageGuidesData() {
-  const allGuides = await fetchGuidesBrowseItems({ windowDays: 30 });
+  // The homepage is still useful without listings, so a failed fetch degrades
+  // to an empty spotlight instead of taking down the whole landing page.
+  let allGuides: GuideBrowseItem[];
+  try {
+    allGuides = await fetchGuidesBrowseItems({ windowDays: 30 });
+  } catch (error) {
+    console.error("[home.guides] failed to load homepage guides", error);
+    return [];
+  }
+
   const sorted = [...allGuides].sort((a, b) => {
     const aKey = a.availableToday ? 1 : 0;
     const bKey = b.availableToday ? 1 : 0;

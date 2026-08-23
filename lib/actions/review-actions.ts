@@ -1,7 +1,7 @@
 "use server";
 
-import { fetchReviewsByTourId } from "@/lib/services/review-service";
+import { fetchReviewsByGuideId } from "@/lib/services/review-service";
 
-export async function getReviewsByTourId(tourId: string) {
-  return fetchReviewsByTourId(tourId);
+export async function getReviewsByGuideId(guideId: string) {
+  return fetchReviewsByGuideId(guideId);
 }

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getFileFromFormData, uploadAvatarFile } from "@/lib/supabase/storage";
 import { ensureProfile } from "@/lib/supabase/ensure-profile";
+import { AuthFlashError, AuthFlashMessage } from "@/lib/i18n/auth-flash";
 
 type MessageType = "error" | "message";
 
@@ -69,7 +70,7 @@ export async function signInAction(formData: FormData) {
     return redirectWithMessage(
       `/${locale}/auth/sign-in`,
       "error",
-      "Email and password are required."
+      AuthFlashError.EmailPasswordRequired
     );
   }
 
@@ -123,7 +124,7 @@ export async function signInWithGoogleAction(formData: FormData) {
     return redirectWithMessage(
       `/${locale}/auth/sign-in`,
       "error",
-      error?.message ?? "Could not start Google sign-in."
+      error?.message ?? AuthFlashError.GoogleStartFailed
     );
   }
 
@@ -147,7 +148,7 @@ export async function signUpAction(formData: FormData) {
     return redirectWithMessage(
       `/${locale}/auth/sign-up`,
       "error",
-      "Email and password are required."
+      AuthFlashError.EmailPasswordRequired
     );
   }
 
@@ -155,7 +156,7 @@ export async function signUpAction(formData: FormData) {
     return redirectWithMessage(
       `/${locale}/auth/sign-up`,
       "error",
-      "Full name is required."
+      AuthFlashError.FullNameRequired
     );
   }
 
@@ -163,7 +164,7 @@ export async function signUpAction(formData: FormData) {
     return redirectWithMessage(
       `/${locale}/auth/sign-up`,
       "error",
-      "Passwords do not match."
+      AuthFlashError.PasswordsMismatch
     );
   }
 
@@ -249,7 +250,7 @@ export async function signUpAction(formData: FormData) {
   redirectWithMessage(
     `/${locale}/auth/sign-in`,
     "message",
-    "Check your email to confirm your account."
+    AuthFlashMessage.CheckEmail
   );
 }
 
@@ -261,11 +262,12 @@ export async function forgotPasswordAction(formData: FormData) {
     return redirectWithMessage(
       `/${locale}/auth/forgot-password`,
       "error",
-      "Email is required."
+      AuthFlashError.EmailRequired
     );
   }
 
-  const origin = await getOrigin();
+  const configuredSiteUrl = getConfiguredSiteUrl();
+  const origin = configuredSiteUrl ?? (await getOrigin());
   const nextPath = `/${locale}/auth/update-password`;
   const callbackUrl = `${origin}/${locale}/auth/callback?next=${encodeURIComponent(
     nextPath
@@ -287,7 +289,7 @@ export async function forgotPasswordAction(formData: FormData) {
   redirectWithMessage(
     `/${locale}/auth/forgot-password`,
     "message",
-    "If an account exists, we will send a reset link."
+    AuthFlashMessage.ResetLinkSent
   );
 }
 
@@ -300,7 +302,7 @@ export async function updatePasswordAction(formData: FormData) {
     return redirectWithMessage(
       `/${locale}/auth/update-password`,
       "error",
-      "Password is required."
+      AuthFlashError.PasswordRequired
     );
   }
 
@@ -308,7 +310,7 @@ export async function updatePasswordAction(formData: FormData) {
     return redirectWithMessage(
       `/${locale}/auth/update-password`,
       "error",
-      "Passwords do not match."
+      AuthFlashError.PasswordsMismatch
     );
   }
 
@@ -326,6 +328,6 @@ export async function updatePasswordAction(formData: FormData) {
   redirectWithMessage(
     `/${locale}/auth/sign-in`,
     "message",
-    "Password updated. Please sign in."
+    AuthFlashMessage.PasswordUpdated
   );
 }

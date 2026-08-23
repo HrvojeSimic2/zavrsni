@@ -61,7 +61,8 @@ export async function POST(req: Request) {
   const parsed = guideApplicationCreateSchema.safeParse(json);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Invalid request.", issues: parsed.error.flatten() },
+      // The client maps this key onto a localised message.
+      { error: "invalidRequest", issues: parsed.error.flatten() },
       { status: 400 }
     );
   }
@@ -122,7 +123,7 @@ export async function POST(req: Request) {
   if (error || !application) {
     console.warn("[guide-applications] failed to store application", error);
     return NextResponse.json(
-      { error: "Failed to submit application." },
+      { error: "submitFailed" },
       { status: 500 }
     );
   }

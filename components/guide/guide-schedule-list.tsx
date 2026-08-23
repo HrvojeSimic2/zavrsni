@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { Badge } from "@/components/ui/badge";
 import type { GuideScheduleDay } from "@/lib/guide/guide-schedule";
 import {
@@ -12,19 +14,23 @@ type Props = {
   locale: string;
   today: string;
   days: GuideScheduleDay[];
+  /** Overrides the default empty-state copy. */
   emptyLabel?: string;
 };
 
-export function GuideScheduleList({
+export async function GuideScheduleList({
   locale,
   today,
   days,
-  emptyLabel = "Nothing scheduled yet. Add availability to a tour to open up dates.",
+  emptyLabel,
 }: Props) {
+  const t = await getTranslations("GuideDashboard");
+  const tList = await getTranslations("GuideDashboard.scheduleList");
+
   if (days.length === 0) {
     return (
       <div className="rounded-lg border border-dashed bg-muted/10 p-4 text-sm text-muted-foreground">
-        {emptyLabel}
+        {emptyLabel ?? tList("empty")}
       </div>
     );
   }
@@ -44,11 +50,14 @@ export function GuideScheduleList({
                   </span>
                   {relative ? (
                     <Badge variant="outline" className="rounded-full">
-                      {relative}
+                      {t(
+                        `relativeDay.${relative.key}`,
+                        relative.key === "inDays" ? { n: relative.days } : undefined
+                      )}
                     </Badge>
                   ) : null}
                   {day.hasPending ? (
-                    <Badge variant="secondary">Needs response</Badge>
+                    <Badge variant="secondary">{tList("needsResponse")}</Badge>
                   ) : null}
                 </div>
                 <div className="text-xs capitalize text-muted-foreground">
@@ -58,33 +67,38 @@ export function GuideScheduleList({
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 <span className="inline-flex items-center gap-1">
                   <Users className="size-3.5" />
-                  {day.bookedGuests} booked
+                  {tList("booked", { n: day.bookedGuests })}
                 </span>
-                <span>{day.availableSpots} spots left</span>
+                <span>{tList("openSlots", { n: day.openSlots })}</span>
               </div>
             </div>
 
             <div>
               {day.entries.map((entry) => (
                 <div
-                  key={`${day.date}:${entry.tourId ?? entry.tourTitle}`}
+                  key={`${day.date}:${entry.slotId ?? entry.startTime ?? "—"}`}
                   className="px-4 py-3 text-sm [&:not(:last-child)]:border-b"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="min-w-0 font-medium truncate">
-                      {entry.tourTitle}
+                    <div className="min-w-0 truncate">
+                      <span className="font-medium">
+                        {entry.startTime && entry.endTime
+                          ? `${entry.startTime} – ${entry.endTime}`
+                          : tList("timeUnknown")}
+                      </span>
+                      {entry.note ? (
+                        <span className="text-muted-foreground"> · {entry.note}</span>
+                      ) : null}
                     </div>
                     <div className="flex items-center gap-2">
                       {entry.bookedGuests > 0 ? (
                         <Badge variant="outline">
-                          {entry.bookedGuests} guests
+                          {tList("guests", { n: entry.bookedGuests })}
                         </Badge>
                       ) : null}
-                      {entry.availableSpots !== null ? (
-                        <Badge variant="secondary">
-                          {entry.availableSpots} spots
-                        </Badge>
-                      ) : null}
+                      <Badge variant={entry.open ? "secondary" : "default"}>
+                        {entry.open ? tList("open") : tList("taken")}
+                      </Badge>
                     </div>
                   </div>
 
@@ -98,17 +112,21 @@ export function GuideScheduleList({
                             className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted/20 px-3 py-2 text-xs"
                           >
                             <span className="min-w-0 truncate">
-                              {reservation.customerName ?? "Guest"} · party of{" "}
-                              {reservation.partySize}
+                              {tList("partyOf", {
+                                name: reservation.customerName ?? tList("guest"),
+                                n: reservation.partySize,
+                              })}
                             </span>
-                            <Badge variant={badge.variant}>{badge.text}</Badge>
+                            <Badge variant={badge.variant}>
+                              {t(`status.${badge.key}`)}
+                            </Badge>
                           </li>
                         );
                       })}
                     </ul>
                   ) : (
                     <div className="mt-2 text-xs text-muted-foreground">
-                      No reservations yet for this date.
+                      {tList("noReservations")}
                     </div>
                   )}
                 </div>

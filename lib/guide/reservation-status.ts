@@ -4,20 +4,27 @@ export { formatMoney, DEFAULT_CURRENCY } from "@/lib/format/money";
 
 type BadgeVariant = "default" | "secondary" | "destructive" | "outline";
 
+/** Message key under `GuideDashboard.status`, paired with the badge styling. */
+export type ReservationBadgeKey =
+  | "pending"
+  | "confirmed"
+  | "cancelled"
+  | "completed";
+
 export function reservationBadge(status: ReservationStatus | null | undefined): {
-  text: string;
+  key: ReservationBadgeKey;
   variant: BadgeVariant;
 } {
   switch (status) {
     case "confirmed":
-      return { text: "Confirmed", variant: "default" };
+      return { key: "confirmed", variant: "default" };
     case "cancelled":
-      return { text: "Cancelled", variant: "destructive" };
+      return { key: "cancelled", variant: "destructive" };
     case "completed":
-      return { text: "Completed", variant: "outline" };
+      return { key: "completed", variant: "outline" };
     case "pending":
     default:
-      return { text: "Pending", variant: "secondary" };
+      return { key: "pending", variant: "secondary" };
   }
 }
 
@@ -33,9 +40,17 @@ export function formatScheduleWeekday(locale: string, value: string): string {
   return new Intl.DateTimeFormat(locale, { weekday: "long" }).format(parsed);
 }
 
+/** Message key under `GuideDashboard.relativeDay`, plus the day count it needs. */
+export type RelativeDay =
+  | { key: "today" }
+  | { key: "tomorrow" }
+  | { key: "inDays"; days: number };
 
 /** Days out from today, used to label a schedule day as Today / Tomorrow / in N days. */
-export function relativeDayLabel(value: string, today: string): string | null {
+export function relativeDayLabel(
+  value: string,
+  today: string
+): RelativeDay | null {
   const target = new Date(`${value}T00:00:00`);
   const base = new Date(`${today}T00:00:00`);
   if (Number.isNaN(target.getTime()) || Number.isNaN(base.getTime())) return null;
@@ -44,8 +59,8 @@ export function relativeDayLabel(value: string, today: string): string | null {
     (target.getTime() - base.getTime()) / (1000 * 60 * 60 * 24)
   );
 
-  if (days === 0) return "Today";
-  if (days === 1) return "Tomorrow";
-  if (days > 1 && days <= 14) return `In ${days} days`;
+  if (days === 0) return { key: "today" };
+  if (days === 1) return { key: "tomorrow" };
+  if (days > 1 && days <= 14) return { key: "inDays", days };
   return null;
 }

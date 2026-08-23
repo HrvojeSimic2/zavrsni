@@ -9,6 +9,7 @@ import {
   ProfileFlashErrorKey,
   ProfileFlashMessageKey,
 } from "./flash";
+import { AuthFlashMessage } from "@/lib/i18n/auth-flash";
 
 type MessageType = "error" | "message";
 
@@ -53,7 +54,7 @@ function redirectToSignIn(locale: Locale): never {
   const next = `/${locale}/profile`;
   const params = new URLSearchParams();
   params.set("next", next);
-  params.set("message", "Please sign in to continue.");
+  params.set("message", AuthFlashMessage.SignInToContinue);
   redirect(`/${locale}/auth/sign-in?${params.toString()}`);
 }
 

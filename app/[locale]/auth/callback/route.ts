@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ensureProfile } from "@/lib/supabase/ensure-profile";
+import { AuthFlashError } from "@/lib/i18n/auth-flash";
 
 function isDebugEnabled() {
   return process.env.SUPABASE_DEBUG === "1";
@@ -37,7 +38,7 @@ export async function GET(
     const errorUrl = new URL(`/${locale}/auth/sign-in`, req.url);
     errorUrl.searchParams.set(
       "error",
-      errorDescription ?? errorParam ?? "Could not authenticate. Please try again."
+      errorDescription ?? errorParam ?? AuthFlashError.AuthFailed
     );
     return NextResponse.redirect(errorUrl);
   }
@@ -53,7 +54,7 @@ export async function GET(
       const errorUrl = new URL(`/${locale}/auth/sign-in`, req.url);
       errorUrl.searchParams.set(
         "error",
-        error.message || "Could not authenticate. Please try again."
+        error.message || AuthFlashError.AuthFailed
       );
       return NextResponse.redirect(errorUrl);
     }

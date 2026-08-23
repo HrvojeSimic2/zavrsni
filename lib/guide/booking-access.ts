@@ -1,34 +1,17 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
+import { normalizeTime } from "@/lib/types/availability";
+
 export type ConfirmedBooking = {
   id: string;
   date: string;
   partySize: number;
-  tourId: string | null;
-  tourTitle: string;
-  meetingPoint: string | null;
   startTime: string | null;
+  endTime: string | null;
+  durationHours: number | null;
+  meetingPoint: string | null;
 };
 
-function firstRelation<T>(value: T | T[] | null | undefined): T | null {
-  if (Array.isArray(value)) return value[0] ?? null;
-  return value ?? null;
-}
-
-type TourRelation = {
-  id: string;
-  title: string;
-  meeting_point: string | null;
-  start_time: string | null;
-};
-
-/**
- * The traveller's next confirmed booking with a given guide, if any.
- *
- * This is the gate for contact details: a phone number is shared once the guide
- * has actually accepted the request, not merely because someone signed up.
- * Returns null for anonymous visitors and for pending or declined requests.
- */
 /**
  * Whether the signed-in user owns this guide profile.
  *
@@ -85,6 +68,16 @@ export async function fetchGuideContact(
   };
 }
 
+/**
+ * The traveller's next confirmed booking with a given guide, if any.
+ *
+ * This is the gate for contact details: a phone number is shared once the guide
+ * has actually accepted the request, not merely because someone signed up.
+ * Returns null for anonymous visitors and for pending or declined requests.
+ *
+ * Everything it needs now lives on the reservation itself — the time and the
+ * meeting point belong to what these two agreed, not to a catalogue entry.
+ */
 export async function fetchConfirmedBookingWithGuide(
   supabase: SupabaseClient,
   user: User | null,
@@ -100,7 +93,7 @@ export async function fetchConfirmedBookingWithGuide(
   const { data, error } = await supabase
     .from("reservations")
     .select(
-      "id, date, party_size, tour:tours ( id, title, meeting_point, start_time )"
+      "id, date, party_size, start_time, end_time, duration_hours, meeting_point"
     )
     .eq("guide_id", guideId)
     .ilike("customer_email", email)
@@ -117,15 +110,20 @@ export async function fetchConfirmedBookingWithGuide(
   const row = (data ?? [])[0] as Record<string, unknown> | undefined;
   if (!row) return null;
 
-  const tour = firstRelation(row.tour as TourRelation | TourRelation[] | null);
+  const startTime = normalizeTime(row.start_time) || null;
+  const endTime = normalizeTime(row.end_time) || null;
+  const durationHours =
+    row.duration_hours === null || row.duration_hours === undefined
+      ? null
+      : Number(row.duration_hours);
 
   return {
     id: String(row.id),
     date: String(row.date),
     partySize: Math.max(Number(row.party_size ?? 1), 1),
-    tourId: tour?.id ?? null,
-    tourTitle: tour?.title ?? "Tour",
-    meetingPoint: tour?.meeting_point ?? null,
-    startTime: tour?.start_time ?? null,
+    startTime,
+    endTime,
+    durationHours: Number.isFinite(durationHours) ? durationHours : null,
+    meetingPoint: (row.meeting_point as string | null) ?? null,
   };
 }

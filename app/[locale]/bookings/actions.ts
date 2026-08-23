@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { AuthFlashMessage } from "@/lib/i18n/auth-flash";
 
 const schema = z.object({
   locale: z.string().min(2),
@@ -52,7 +53,7 @@ export async function cancelBookingAction(formData: FormData) {
   if (userError || !user) {
     const query = new URLSearchParams();
     query.set("next", `/${locale}/bookings`);
-    query.set("message", "Please sign in to continue.");
+    query.set("message", AuthFlashMessage.SignInToContinue);
     redirect(`/${locale}/auth/sign-in?${query.toString()}`);
   }
 
@@ -63,7 +64,7 @@ export async function cancelBookingAction(formData: FormData) {
 
   const { data: reservation, error: loadError } = await admin
     .from("reservations")
-    .select("id, status, date, tour_id, party_size, customer_email")
+    .select("id, status, date, guide_id, availability_id, party_size, customer_email")
     .eq("id", reservationId)
     .maybeSingle();
 
@@ -86,7 +87,7 @@ export async function cancelBookingAction(formData: FormData) {
     redirectWith(locale, "error", "alreadyDone");
   }
 
-  // Date-only granularity: the day of the tour is already too late to drop out.
+  // Date-only granularity: the day itself is already too late to drop out.
   const today = new Date().toISOString().slice(0, 10);
   if (String(reservation.date) <= today) {
     redirectWith(locale, "error", "tooLate");
@@ -102,38 +103,16 @@ export async function cancelBookingAction(formData: FormData) {
     redirectWith(locale, "error", "failed");
   }
 
-  // Hand the spots back, exactly as declining does on the guide side.
-  const partySize = Math.max(Number(reservation.party_size ?? 0), 0);
-  if (partySize > 0 && reservation.tour_id) {
-    const { data: availability } = await admin
-      .from("tour_availability")
-      .select("available_spots")
-      .eq("tour_id", reservation.tour_id)
-      .eq("date", reservation.date)
-      .maybeSingle();
-
-    if (availability) {
-      const { error: restoreError } = await admin
-        .from("tour_availability")
-        .update({
-          available_spots: Number(availability.available_spots ?? 0) + partySize,
-        })
-        .eq("tour_id", reservation.tour_id)
-        .eq("date", reservation.date);
-
-      if (restoreError) {
-        console.warn("[bookings] failed to return spots", restoreError);
-      }
-    }
-  }
+  // Cancelling frees the slot by itself — it is held only while the request is
+  // pending or confirmed. Nothing to restore.
 
   revalidatePath(`/${locale}/bookings`);
   revalidatePath(`/${locale}/guide`);
   revalidatePath(`/${locale}/guide/reservations`);
   revalidatePath(`/${locale}/guide/schedule`);
   revalidatePath(`/${locale}/guide/events`);
-  if (reservation.tour_id) {
-    revalidatePath(`/${locale}/tour/${reservation.tour_id}`);
+  if (reservation.guide_id) {
+    revalidatePath(`/${locale}/guides/${reservation.guide_id}`);
   }
 
   redirectWith(locale, "status", "cancelled");

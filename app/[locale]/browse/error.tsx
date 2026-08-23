@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Link } from "@/i18n/routing";
+import { useTranslations } from "next-intl";
 
 export default function Error({
   error,
@@ -20,6 +21,8 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const t = useTranslations("Browse.error");
+
   useEffect(() => {
     // Keep for debugging; error boundaries shouldn't swallow errors silently.
     console.error("[browse] failed to render", error);
@@ -30,10 +33,8 @@ export default function Error({
       <div className="container py-12">
         <Card className="mx-auto max-w-xl">
           <CardHeader>
-            <CardTitle>Couldn&apos;t load guides</CardTitle>
-            <CardDescription>
-              Something went wrong while fetching guides. Please try again.
-            </CardDescription>
+            <CardTitle>{t("title")}</CardTitle>
+            <CardDescription>{t("description")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             {process.env.NODE_ENV === "development" ? (
@@ -43,14 +44,14 @@ export default function Error({
             ) : null}
             {error.digest ? (
               <p className="text-xs text-muted-foreground">
-                Error reference: {error.digest}
+                {t("reference", { digest: error.digest })}
               </p>
             ) : null}
           </CardContent>
           <CardFooter className="flex gap-3">
-            <Button onClick={reset}>Try again</Button>
+            <Button onClick={reset}>{t("retry")}</Button>
             <Button variant="outline" asChild>
-              <Link href="/">Go home</Link>
+              <Link href="/">{t("goHome")}</Link>
             </Button>
           </CardFooter>
         </Card>

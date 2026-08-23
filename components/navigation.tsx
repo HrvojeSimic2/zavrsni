@@ -254,7 +254,7 @@ export function Navigation() {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
               <MapPin className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-semibold">LocalPath</span>
+            <span className="text-xl font-semibold">Peregrine</span>
           </Link>
 
           <nav className="hidden md:flex items-center gap-6">
@@ -280,7 +280,7 @@ export function Navigation() {
                 <Link
                   href="/profile"
                   className="md:hidden"
-                  aria-label="Open profile"
+                  aria-label={t("openProfile")}
                 >
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={avatarSrc} alt={displayName} />
@@ -290,7 +290,7 @@ export function Navigation() {
                 <Link
                   href="/profile"
                   className="hidden md:flex items-center gap-2 rounded-full px-2 py-1 hover:bg-muted transition-colors"
-                  aria-label="Open profile"
+                  aria-label={t("openProfile")}
                 >
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={avatarSrc} alt={displayName} />
@@ -306,7 +306,7 @@ export function Navigation() {
                   className="hidden md:flex"
                 >
                   <Button variant="ghost" size="sm" type="submit">
-                    Sign Out
+                    {t("signOut")}
                   </Button>
                 </form>
               </>
@@ -329,7 +329,7 @@ export function Navigation() {
               variant="ghost"
               size="icon"
               className="md:hidden"
-              aria-label="Open navigation menu"
+              aria-label={t("openMenu")}
               onClick={() => setIsMobileMenuOpen(true)}
             >
               <Menu className="h-5 w-5" />
@@ -365,12 +365,12 @@ export function Navigation() {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
                 <MapPin className="h-5 w-5 text-primary-foreground" />
               </div>
-              <span className="text-lg font-semibold">LocalPath</span>
+              <span className="text-lg font-semibold">Peregrine</span>
             </Link>
             <Button
               variant="ghost"
               size="icon"
-              aria-label="Close navigation menu"
+              aria-label={t("closeMenu")}
               onClick={closeMenu}
             >
               <X className="h-5 w-5" />
@@ -430,7 +430,7 @@ export function Navigation() {
                   type="submit"
                   onClick={closeMenu}
                 >
-                  Sign Out
+                  {t("signOut")}
                 </Button>
               </form>
             ) : isSessionLoaded ? (

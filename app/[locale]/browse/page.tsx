@@ -12,6 +12,7 @@ type BrowseSearchParams = {
   language?: SearchParamValue;
   available?: SearchParamValue;
   verified?: SearchParamValue;
+  maxRate?: SearchParamValue;
   sort?: SearchParamValue;
   page?: SearchParamValue;
 };
@@ -36,6 +37,7 @@ export default async function BrowsePage({
     language: getFirst(resolvedSearchParams?.language) ?? null,
     available: getFirst(resolvedSearchParams?.available) ?? null,
     verified: getFirst(resolvedSearchParams?.verified) ?? null,
+    maxRate: getFirst(resolvedSearchParams?.maxRate) ?? null,
     sort: getFirst(resolvedSearchParams?.sort) ?? null,
     page: getFirst(resolvedSearchParams?.page) ?? null,
   });

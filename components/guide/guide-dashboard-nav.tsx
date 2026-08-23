@@ -1,3 +1,5 @@
+import { getTranslations } from "next-intl/server";
+
 import { Link } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
 import {
@@ -5,7 +7,6 @@ import {
   CalendarDays,
   ClipboardList,
   LayoutDashboard,
-  Map,
   UserRound,
 } from "lucide-react";
 import type { ComponentType } from "react";
@@ -13,7 +14,6 @@ import type { ComponentType } from "react";
 type ItemKey =
   | "overview"
   | "schedule"
-  | "tours"
   | "events"
   | "reservations"
   | "profile";
@@ -25,36 +25,21 @@ type Props = {
 const items: Array<{
   key: ItemKey;
   href: string;
-  label: string;
   icon: ComponentType<{ className?: string }>;
 }> = [
-  { key: "overview", href: "/guide", label: "Overview", icon: LayoutDashboard },
-  {
-    key: "schedule",
-    href: "/guide/schedule",
-    label: "Schedule",
-    icon: CalendarClock,
-  },
-  { key: "tours", href: "/guide/tours", label: "Tours", icon: Map },
-  { key: "events", href: "/guide/events", label: "Dates", icon: CalendarDays },
-  {
-    key: "reservations",
-    href: "/guide/reservations",
-    label: "Reservations",
-    icon: ClipboardList,
-  },
-  {
-    key: "profile",
-    href: "/guide/profile",
-    label: "Profile",
-    icon: UserRound,
-  },
+  { key: "overview", href: "/guide", icon: LayoutDashboard },
+  { key: "schedule", href: "/guide/schedule", icon: CalendarClock },
+  { key: "events", href: "/guide/events", icon: CalendarDays },
+  { key: "reservations", href: "/guide/reservations", icon: ClipboardList },
+  { key: "profile", href: "/guide/profile", icon: UserRound },
 ];
 
-export function GuideDashboardNav({ active }: Props) {
+export async function GuideDashboardNav({ active }: Props) {
+  const t = await getTranslations("GuideDashboard.nav");
+
   return (
     <nav
-      aria-label="Guide dashboard navigation"
+      aria-label={t("aria")}
       className="flex flex-wrap items-center gap-1 rounded-xl border bg-muted/20 p-1"
     >
       {items.map((item) => (
@@ -70,7 +55,7 @@ export function GuideDashboardNav({ active }: Props) {
           )}
         >
           <item.icon className="size-4" />
-          {item.label}
+          {t(item.key)}
         </Link>
       ))}
     </nav>

@@ -1,24 +1,28 @@
 import type { ReactNode } from "react";
+import { getTranslations } from "next-intl/server";
 
 import { cn } from "@/lib/utils";
 
 type Props = {
   title: string;
   description?: string;
+  /** Overrides the default "Guide dashboard" eyebrow. */
   eyebrow?: string;
   badge?: ReactNode;
   actions?: ReactNode;
   className?: string;
 };
 
-export function GuidePageHeader({
+export async function GuidePageHeader({
   title,
   description,
-  eyebrow = "Guide dashboard",
+  eyebrow,
   badge,
   actions,
   className,
 }: Props) {
+  const t = await getTranslations("GuideDashboard");
+
   return (
     <section
       className={cn(
@@ -28,7 +32,9 @@ export function GuidePageHeader({
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
-          <p className="text-sm font-medium text-muted-foreground">{eyebrow}</p>
+          <p className="text-sm font-medium text-muted-foreground">
+            {eyebrow ?? t("eyebrow")}
+          </p>
           <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
           {description ? (
             <p className="text-sm text-muted-foreground">{description}</p>
@@ -44,4 +50,3 @@ export function GuidePageHeader({
     </section>
   );
 }
-

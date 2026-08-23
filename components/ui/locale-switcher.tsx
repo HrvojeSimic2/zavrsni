@@ -1,7 +1,7 @@
 "use client";
 
 import { Globe } from "lucide-react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
@@ -32,6 +32,7 @@ export function LocaleSwitcher({
   size = "sm",
 }: LocaleSwitcherProps) {
   const locale = useLocale() as Locale;
+  const t = useTranslations("Common");
   const router = useRouter();
   const pathname = usePathname();
   const params = useParams();
@@ -62,11 +63,11 @@ export function LocaleSwitcher({
     <Select value={locale} onValueChange={handleChange} disabled={isPending}>
       <SelectTrigger
         size={size}
-        aria-label="Select language"
+        aria-label={t("selectLanguage")}
         className={cn("gap-2", className)}
       >
         <Globe className="size-4" />
-        <SelectValue placeholder="Language" />
+        <SelectValue placeholder={t("language")} />
       </SelectTrigger>
       <SelectContent align="end">
         {localeOptions.map((option) => (

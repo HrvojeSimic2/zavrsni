@@ -1,22 +1,25 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
 import type { ReservationStatus } from "@/lib/guide/guide-dashboard-data";
+import { normalizeTime } from "@/lib/types/availability";
 
 export type TravellerBooking = {
   id: string;
   date: string;
+  startTime: string | null;
+  endTime: string | null;
+  durationHours: number | null;
   partySize: number;
   status: ReservationStatus;
   totalAmount: number | null;
   currency: string;
   createdAt: string;
-  tourId: string | null;
-  tourTitle: string;
   meetingPoint: string | null;
-  startTime: string | null;
-  place: string;
+  requestNote: string | null;
   guideId: string | null;
   guideName: string;
+  /** Where the guide works, for context on the card. */
+  place: string;
 };
 
 export type TravellerBookings = {
@@ -41,16 +44,12 @@ function toStatus(value: unknown): ReservationStatus {
     : "pending";
 }
 
-function formatPlace(location: unknown, country: unknown): string {
-  return [location, country]
-    .map((part) => String(part ?? "").trim())
-    .filter(Boolean)
-    .join(", ");
-}
-
 /**
  * Every booking belonging to the signed-in traveller, split by whether it is
  * still ahead of them.
+ *
+ * A booking is time with a person: the guide is the relation, and the when and
+ * where come from the reservation row itself.
  *
  * Reservations carry no user_id, so the link is the email captured with the
  * booking; the RLS policy matches on the same column, which keeps this honest.
@@ -65,7 +64,7 @@ export async function fetchTravellerBookings(
   const { data, error } = await supabase
     .from("reservations")
     .select(
-      "id, date, party_size, status, total_amount, currency, created_at, tour:tours ( id, title, meeting_point, start_time, location, country ), guide:guides ( id, name )"
+      "id, date, start_time, end_time, duration_hours, party_size, status, total_amount, currency, created_at, meeting_point, request_note, guide:guides ( id, name, location )"
     )
     .ilike("customer_email", email)
     .order("date", { ascending: false })
@@ -81,16 +80,20 @@ export async function fetchTravellerBookings(
   const bookings: TravellerBooking[] = (
     (data ?? []) as Array<Record<string, unknown>>
   ).map((row) => {
-    const tour = firstRelation(
-      row.tour as Record<string, unknown> | Record<string, unknown>[] | null
-    );
     const guide = firstRelation(
       row.guide as Record<string, unknown> | Record<string, unknown>[] | null
     );
+    const duration =
+      row.duration_hours === null || row.duration_hours === undefined
+        ? null
+        : Number(row.duration_hours);
 
     return {
       id: String(row.id),
       date: String(row.date),
+      startTime: normalizeTime(row.start_time) || null,
+      endTime: normalizeTime(row.end_time) || null,
+      durationHours: Number.isFinite(duration) ? duration : null,
       partySize: Math.max(Number(row.party_size ?? 1), 1),
       status: toStatus(row.status),
       totalAmount:
@@ -99,13 +102,11 @@ export async function fetchTravellerBookings(
           : Number(row.total_amount),
       currency: String(row.currency ?? "EUR"),
       createdAt: String(row.created_at ?? ""),
-      tourId: tour?.id ? String(tour.id) : null,
-      tourTitle: String(tour?.title ?? "Tour"),
-      meetingPoint: (tour?.meeting_point as string | null) ?? null,
-      startTime: (tour?.start_time as string | null) ?? null,
-      place: formatPlace(tour?.location, tour?.country),
+      meetingPoint: (row.meeting_point as string | null) ?? null,
+      requestNote: (row.request_note as string | null) ?? null,
       guideId: guide?.id ? String(guide.id) : null,
       guideName: String(guide?.name ?? "Guide"),
+      place: String(guide?.location ?? "").trim(),
     };
   });
 

@@ -31,7 +31,7 @@ export default async function HowItWorksPage() {
                   <div className="relative aspect-4/3">
                     <Image
                       src="/bangkok-street-food-market.jpg"
-                      alt="Find a guide"
+                      alt={t("step1Alt")}
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-700"
                     />
@@ -74,7 +74,7 @@ export default async function HowItWorksPage() {
                   <div className="relative aspect-4/3">
                     <Image
                       src="/jazz-club-interior.jpg"
-                      alt="Connect with guides"
+                      alt={t("step2Alt")}
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-700"
                     />
@@ -89,7 +89,7 @@ export default async function HowItWorksPage() {
                   <div className="relative aspect-4/3">
                     <Image
                       src="/hidden-waterfall-bali.jpg"
-                      alt="Experience adventure"
+                      alt={t("step3Alt")}
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-700"
                     />

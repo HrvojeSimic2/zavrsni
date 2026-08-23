@@ -6,7 +6,6 @@ import { Link } from "@/i18n/routing";
 import { GuideDashboardNav } from "@/components/guide/guide-dashboard-nav";
 import { GuidePageHeader } from "@/components/guide/guide-page-header";
 import { ClaimGuideProfileCard } from "@/components/guide/claim-guide-profile-card";
-import { NewTourDialog } from "@/components/guide/new-tour-dialog";
 import { GuideMetricCard } from "@/components/guide/guide-metric-card";
 import { GuideScheduleList } from "@/components/guide/guide-schedule-list";
 import { requireGuide } from "@/lib/guide/require-guide";
@@ -21,11 +20,12 @@ import {
 import {
   CalendarDays,
   ClipboardList,
-  Map,
   Star,
   TrendingUp,
   Users,
+  Wallet,
 } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 
 type PageProps = {
   params: { locale: string } | Promise<{ locale: string }>;
@@ -35,17 +35,19 @@ const SCHEDULE_PREVIEW_DAYS = 5;
 
 export default async function GuideDashboardPage({ params }: PageProps) {
   const { locale } = await Promise.resolve(params);
+  const t = await getTranslations("GuideDashboard");
+  const tPage = await getTranslations("GuideDashboard.overview");
 
   const { supabase, guide, needsClaim } = await requireGuide(locale, "/guide");
 
-  // Past tours settle themselves, so the metrics below count what really happened.
+  // Past bookings settle themselves, so the metrics below count what really happened.
   await settleCompletedReservationsThrottled();
 
-  const { metrics, upcomingEvents, upcomingReservations, tours } =
+  const { metrics, upcomingSlots, upcomingReservations } =
     await fetchGuideDashboardData(supabase, guide.id);
 
   const today = new Date().toISOString().slice(0, 10);
-  const schedule = buildGuideSchedule(upcomingEvents, upcomingReservations);
+  const schedule = buildGuideSchedule(upcomingSlots, upcomingReservations);
   const schedulePreview = schedule.slice(0, SCHEDULE_PREVIEW_DAYS);
 
   const pendingReservations = upcomingReservations.filter(
@@ -53,23 +55,33 @@ export default async function GuideDashboardPage({ params }: PageProps) {
   );
 
   const fillRateLabel =
-    metrics.fillRate === null ? "—" : `${Math.round(metrics.fillRate * 100)}%`;
+    metrics.fillRate === null
+      ? t("empty")
+      : `${Math.round(metrics.fillRate * 100)}%`;
 
   return (
     <PageShell variant="contained" contentClassName="max-w-6xl space-y-8">
       <GuidePageHeader
-        title="Overview"
-        description="Your numbers for the next 30 days, plus what is coming up."
+        title={tPage("title")}
+        description={tPage("description")}
         badge={
           <Badge variant={guide.verified ? "default" : "secondary"}>
-            {guide.verified ? "Verified" : "Not verified"}
+            {guide.verified ? t("verified") : t("notVerified")}
           </Badge>
         }
         actions={
           <>
-            <NewTourDialog locale={locale} disabled={needsClaim} />
+            {/* `disabled` on an asChild button reaches an anchor, which ignores
+                it, so an unclaimed profile gets a real disabled button. */}
+            {needsClaim ? (
+              <Button disabled>{tPage("openSlots")}</Button>
+            ) : (
+              <Button asChild>
+                <Link href="/guide/events">{tPage("openSlots")}</Link>
+              </Button>
+            )}
             <Button asChild variant="outline">
-              <Link href="/guide/profile">Edit profile</Link>
+              <Link href="/guide/profile">{tPage("editProfile")}</Link>
             </Button>
           </>
         }
@@ -81,10 +93,10 @@ export default async function GuideDashboardPage({ params }: PageProps) {
         <ClaimGuideProfileCard
           locale={locale}
           guideId={guide.id}
-          description="We found a guide profile that matches your email. Claim it to create tours, manage availability, and handle reservations."
+          descriptionKey="descriptionFull"
           secondaryAction={
             <Button asChild variant="outline">
-              <Link href="/profile">Go to profile</Link>
+              <Link href="/profile">{tPage("goToProfile")}</Link>
             </Button>
           }
         />
@@ -95,15 +107,14 @@ export default async function GuideDashboardPage({ params }: PageProps) {
           <CardContent className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="font-medium">
-                {pendingReservations.length} reservation
-                {pendingReservations.length === 1 ? "" : "s"} waiting on you
+                {tPage("pendingBanner", { n: pendingReservations.length })}
               </div>
               <div className="text-sm text-muted-foreground">
-                Confirm or decline them so guests can plan their trip.
+                {tPage("pendingBannerHint")}
               </div>
             </div>
             <Button asChild size="sm">
-              <Link href="/guide/reservations">Review requests</Link>
+              <Link href="/guide/reservations">{tPage("reviewRequests")}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -111,53 +122,54 @@ export default async function GuideDashboardPage({ params }: PageProps) {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <GuideMetricCard
-          label="Upcoming guests"
+          label={tPage("metricGuests")}
           value={metrics.upcomingGuests}
-          hint={`Across ${metrics.upcomingReservationCount} reservation${
-            metrics.upcomingReservationCount === 1 ? "" : "s"
-          }`}
+          hint={tPage("metricGuestsHint", {
+            n: metrics.upcomingReservationCount,
+          })}
           icon={Users}
         />
         <GuideMetricCard
-          label="Expected revenue"
+          label={tPage("metricRevenue")}
           value={formatMoney(locale, metrics.upcomingRevenue, metrics.currency)}
-          hint="Confirmed bookings, next 30 days"
+          hint={tPage("metricRevenueHint")}
           icon={TrendingUp}
         />
         <GuideMetricCard
-          label="Capacity sold"
+          label={tPage("metricCapacity")}
           value={fillRateLabel}
-          hint={`${metrics.bookedGuestsNext30} booked · ${metrics.upcomingSpots} spots left`}
+          hint={tPage("metricCapacityHint", {
+            booked: metrics.bookedSlotCount,
+            left: metrics.openSlotCount,
+          })}
           icon={ClipboardList}
         />
         <GuideMetricCard
-          label="Scheduled dates"
-          value={metrics.upcomingEventCount}
-          hint={`${metrics.tourCount} tour${metrics.tourCount === 1 ? "" : "s"} published`}
+          label={tPage("metricDates")}
+          value={metrics.openSlotCount}
+          hint={tPage("metricDatesHint", { n: metrics.openHours })}
           icon={CalendarDays}
         />
         <GuideMetricCard
-          label="Rating"
-          value={metrics.rating > 0 ? metrics.rating.toFixed(1) : "—"}
-          hint={`${metrics.reviewCount} review${metrics.reviewCount === 1 ? "" : "s"}`}
+          label={tPage("metricRating")}
+          value={metrics.rating > 0 ? metrics.rating.toFixed(1) : t("empty")}
+          hint={tPage("metricRatingHint", { n: metrics.reviewCount })}
           icon={Star}
         />
         <GuideMetricCard
-          label="Last 30 days"
+          label={tPage("metricLast30")}
           value={formatMoney(locale, metrics.revenueLast30, metrics.currency)}
-          hint={`${metrics.reservationsLast30} reservation${
-            metrics.reservationsLast30 === 1 ? "" : "s"
-          } completed`}
-          icon={Map}
+          hint={tPage("metricLast30Hint", { n: metrics.reservationsLast30 })}
+          icon={Wallet}
         />
       </div>
 
       <Card>
         <CardHeader className="border-b">
-          <CardTitle>Schedule</CardTitle>
+          <CardTitle>{tPage("scheduleTitle")}</CardTitle>
           <CardAction>
             <Button asChild variant="outline" size="sm">
-              <Link href="/guide/schedule">Full schedule</Link>
+              <Link href="/guide/schedule">{tPage("fullSchedule")}</Link>
             </Button>
           </CardAction>
         </CardHeader>
@@ -167,9 +179,9 @@ export default async function GuideDashboardPage({ params }: PageProps) {
             today={today}
             days={schedulePreview}
             emptyLabel={
-              tours.length === 0
-                ? "Create your first tour, then add dates to start filling your schedule."
-                : "No dates scheduled yet. Add availability to a tour to open up bookings."
+              upcomingSlots.length === 0
+                ? tPage("scheduleEmptyNoSlots")
+                : tPage("scheduleEmpty")
             }
           />
         </CardContent>
@@ -178,32 +190,37 @@ export default async function GuideDashboardPage({ params }: PageProps) {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader className="border-b">
-            <CardTitle>Upcoming events</CardTitle>
+            <CardTitle>{tPage("eventsTitle")}</CardTitle>
             <CardAction>
               <Button asChild variant="outline" size="sm">
-                <Link href="/guide/events">View all</Link>
+                <Link href="/guide/events">{tPage("viewAll")}</Link>
               </Button>
             </CardAction>
           </CardHeader>
           <CardContent>
-            {upcomingEvents.length === 0 ? (
+            {upcomingSlots.length === 0 ? (
               <div className="rounded-lg border border-dashed bg-muted/10 p-4 text-sm text-muted-foreground">
-                No upcoming availability yet.
+                {tPage("eventsEmpty")}
               </div>
             ) : (
               <div className="overflow-hidden rounded-lg border">
-                {upcomingEvents.slice(0, 6).map((event) => (
+                {upcomingSlots.slice(0, 6).map((slot) => (
                   <div
-                    key={`${event.tourId}:${event.date}`}
+                    key={slot.id}
                     className="flex items-center justify-between gap-4 px-4 py-3 text-sm transition-colors hover:bg-muted/20 [&:not(:last-child)]:border-b"
                   >
                     <div className="min-w-0">
-                      <div className="font-medium truncate">{event.tourTitle}</div>
+                      <div className="font-medium truncate">
+                        {`${slot.startTime} – ${slot.endTime}`}
+                        {slot.note ? ` · ${slot.note}` : ""}
+                      </div>
                       <div className="text-xs text-muted-foreground">
-                        {formatScheduleDate(locale, event.date)}
+                        {formatScheduleDate(locale, slot.date)}
                       </div>
                     </div>
-                    <Badge variant="secondary">{event.availableSpots} spots</Badge>
+                    <Badge variant={slot.booked ? "default" : "secondary"}>
+                      {slot.booked ? tPage("slotTaken") : tPage("slotOpen")}
+                    </Badge>
                   </div>
                 ))}
               </div>
@@ -213,17 +230,17 @@ export default async function GuideDashboardPage({ params }: PageProps) {
 
         <Card>
           <CardHeader className="border-b">
-            <CardTitle>Upcoming reservations</CardTitle>
+            <CardTitle>{tPage("reservationsTitle")}</CardTitle>
             <CardAction>
               <Button asChild variant="outline" size="sm">
-                <Link href="/guide/reservations">View all</Link>
+                <Link href="/guide/reservations">{tPage("viewAll")}</Link>
               </Button>
             </CardAction>
           </CardHeader>
           <CardContent>
             {upcomingReservations.length === 0 ? (
               <div className="rounded-lg border border-dashed bg-muted/10 p-4 text-sm text-muted-foreground">
-                No reservations yet.
+                {tPage("reservationsEmpty")}
               </div>
             ) : (
               <div className="overflow-hidden rounded-lg border">
@@ -236,14 +253,17 @@ export default async function GuideDashboardPage({ params }: PageProps) {
                     >
                       <div className="min-w-0">
                         <div className="font-medium truncate">
-                          {reservation.tourTitle}
+                          {reservation.customerName ?? tPage("guest")}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {formatScheduleDate(locale, reservation.date)} | Party{" "}
-                          {reservation.partySize}
+                          {`${formatScheduleDate(locale, reservation.date)}${
+                            reservation.startTime ? ` · ${reservation.startTime}` : ""
+                          } | ${tPage("party", { n: reservation.partySize })}`}
                         </div>
                       </div>
-                      <Badge variant={badge.variant}>{badge.text}</Badge>
+                      <Badge variant={badge.variant}>
+                        {t(`status.${badge.key}`)}
+                      </Badge>
                     </div>
                   );
                 })}

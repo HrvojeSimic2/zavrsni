@@ -27,7 +27,7 @@ type Props = {
 const REFRESH_INTERVAL_MS = 60_000;
 
 function storageKey(userId: string) {
-  return `localpath:notifications:last-seen:${userId}`;
+  return `peregrine:notifications:last-seen:${userId}`;
 }
 
 function readLastSeen(userId: string): string {
@@ -178,7 +178,10 @@ export function NotificationsBell({
   const describe = useCallback(
     (item: AppNotification) => {
       const person = item.personName ?? t("someone");
-      const tour = item.tourTitle ?? t("aTour");
+      // The booking is identified by when it is, not by a product name.
+      const when = [formatDate(item.date), item.timeLabel]
+        .filter(Boolean)
+        .join(" · ") || t("aBooking");
 
       switch (item.kind) {
         case "reservation_request":
@@ -187,23 +190,23 @@ export function NotificationsBell({
             body: t("request.body", {
               person,
               party: item.partySize ?? 1,
-              tour,
+              when,
             }),
           };
         case "reservation_pending":
           return {
             title: t("pending.title"),
-            body: t("pending.body", { guide: person, tour }),
+            body: t("pending.body", { guide: person, when }),
           };
         case "reservation_confirmed":
           return {
             title: t("confirmed.title"),
-            body: t("confirmed.body", { guide: person, tour }),
+            body: t("confirmed.body", { guide: person, when }),
           };
         case "reservation_declined":
           return {
             title: t("declined.title"),
-            body: t("declined.body", { guide: person, tour }),
+            body: t("declined.body", { guide: person, when }),
           };
         case "guide_application":
           if (item.status === "accepted") {
@@ -226,7 +229,7 @@ export function NotificationsBell({
           return { title: t("title"), body: "" };
       }
     },
-    [t]
+    [formatDate, t]
   );
 
   const list = (
@@ -273,7 +276,7 @@ export function NotificationsBell({
                     href={`/api/reservations/${item.id.replace(
                       /^booking:/,
                       ""
-                    )}/calendar`}
+                    )}/calendar?locale=${locale}`}
                     onClick={(event) => event.stopPropagation()}
                     className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                   >

@@ -11,8 +11,11 @@ import { GuideDashboardNav } from "@/components/guide/guide-dashboard-nav";
 import { GuidePageHeader } from "@/components/guide/guide-page-header";
 import { ClaimGuideProfileCard } from "@/components/guide/claim-guide-profile-card";
 import { requireGuide } from "@/lib/guide/require-guide";
+import { SPECIALTIES, toSpecialties } from "@/lib/types/specialty";
 import { getInitials } from "@/lib/guide/get-initials";
 import { updateGuideProfileAction } from "./actions";
+import { getTranslations } from "next-intl/server";
+import { resolveFlash } from "@/lib/i18n/flash";
 
 type PageProps = {
   params: { locale: string } | Promise<{ locale: string }>;
@@ -34,6 +37,10 @@ type GuideProfileRow = {
   phone: string | null;
   email: string | null;
   verified: boolean | null;
+  hourly_rate: number | null;
+  specialties: string[] | null;
+  max_group_size: number | null;
+  default_meeting_point: string | null;
 };
 
 export default async function GuideProfileSettingsPage({
@@ -42,6 +49,8 @@ export default async function GuideProfileSettingsPage({
 }: PageProps) {
   const { locale } = await Promise.resolve(params);
   const resolvedSearch = (await Promise.resolve(searchParams)) ?? {};
+  const t = await getTranslations("GuideDashboard");
+  const tPage = await getTranslations("GuideDashboard.profile");
 
   const { supabase, guide, needsClaim } = await requireGuide(
     locale,
@@ -51,7 +60,7 @@ export default async function GuideProfileSettingsPage({
   const { data, error } = await supabase
     .from("guides")
     .select(
-      "id, name, avatar, headline, bio, location, languages, years_experience, website, phone, email, verified"
+      "id, name, avatar, headline, bio, location, languages, years_experience, website, phone, email, verified, hourly_rate, specialties, max_group_size, default_meeting_point"
     )
     .eq("id", guide.id)
     .maybeSingle();
@@ -64,22 +73,23 @@ export default async function GuideProfileSettingsPage({
 
   const name = profile?.name ?? guide.name;
   const languages = (profile?.languages ?? guide.languages ?? []).join(", ");
+  const selectedSpecialties = toSpecialties(profile?.specialties);
   const saved = resolvedSearch.status === "saved";
-  const errorMessage = resolvedSearch.error;
+  const errorMessage = resolveFlash(t, "errors", resolvedSearch.error);
 
   return (
     <PageShell variant="contained" contentClassName="max-w-5xl space-y-8">
       <GuidePageHeader
-        title="Profile"
-        description="This is what travellers see when they find you on LocalPath."
+        title={tPage("title")}
+        description={tPage("description")}
         badge={
           <Badge variant={guide.verified ? "default" : "secondary"}>
-            {guide.verified ? "Verified" : "Not verified"}
+            {guide.verified ? t("verified") : t("notVerified")}
           </Badge>
         }
         actions={
           <Button asChild variant="outline">
-            <Link href={`/guides/${guide.id}`}>View public profile</Link>
+            <Link href={`/guides/${guide.id}`}>{tPage("viewPublic")}</Link>
           </Button>
         }
       />
@@ -90,13 +100,13 @@ export default async function GuideProfileSettingsPage({
         <ClaimGuideProfileCard
           locale={locale}
           guideId={guide.id}
-          description="Claim your guide profile before you can edit it."
+          descriptionKey="descriptionProfile"
         />
       ) : null}
 
       {saved ? (
         <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
-          Your profile has been updated.
+          {t("status.saved")}
         </div>
       ) : null}
 
@@ -108,9 +118,9 @@ export default async function GuideProfileSettingsPage({
 
       {error ? (
         <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          Could not load the profile fields. If this is the first run, apply the
-          latest Supabase migration (
-          <code>20260812120000_add_guide_profile_fields.sql</code>).
+          {tPage("loadFieldsError", {
+            migration: "20260812120000_add_guide_profile_fields.sql",
+          })}
         </div>
       ) : null}
 
@@ -119,7 +129,7 @@ export default async function GuideProfileSettingsPage({
 
         <Card>
           <CardHeader>
-            <CardTitle>Photo and name</CardTitle>
+            <CardTitle>{tPage("photoAndNameTitle")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -128,7 +138,7 @@ export default async function GuideProfileSettingsPage({
                 <AvatarFallback>{getInitials(name)}</AvatarFallback>
               </Avatar>
               <div className="space-y-2">
-                <Label htmlFor="photo">Profile photo</Label>
+                <Label htmlFor="photo">{tPage("photoLabel")}</Label>
                 <Input
                   id="photo"
                   name="photo"
@@ -137,14 +147,14 @@ export default async function GuideProfileSettingsPage({
                   disabled={needsClaim}
                 />
                 <p className="text-xs text-muted-foreground">
-                  JPG or PNG, up to 5MB.
+                  {tPage("photoHelp")}
                 </p>
               </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="name">Display name</Label>
+                <Label htmlFor="name">{tPage("nameLabel")}</Label>
                 <Input
                   id="name"
                   name="name"
@@ -155,13 +165,13 @@ export default async function GuideProfileSettingsPage({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="headline">Headline</Label>
+                <Label htmlFor="headline">{tPage("headlineLabel")}</Label>
                 <Input
                   id="headline"
                   name="headline"
                   defaultValue={profile?.headline ?? ""}
                   maxLength={120}
-                  placeholder="Food-obsessed local showing you the real Zagreb"
+                  placeholder={tPage("headlinePlaceholder")}
                   disabled={needsClaim}
                 />
               </div>
@@ -171,39 +181,39 @@ export default async function GuideProfileSettingsPage({
 
         <Card>
           <CardHeader>
-            <CardTitle>About you</CardTitle>
+            <CardTitle>{tPage("aboutTitle")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="bio">Bio</Label>
+              <Label htmlFor="bio">{tPage("bioLabel")}</Label>
               <Textarea
                 id="bio"
                 name="bio"
                 rows={6}
                 maxLength={2000}
                 defaultValue={profile?.bio ?? ""}
-                placeholder="Tell travellers who you are, what you love showing people, and what a day with you feels like."
+                placeholder={tPage("bioPlaceholder")}
                 disabled={needsClaim}
               />
               <p className="text-xs text-muted-foreground">
-                Up to 2000 characters.
+                {tPage("bioHelp")}
               </p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="location">Based in</Label>
+                <Label htmlFor="location">{tPage("locationLabel")}</Label>
                 <Input
                   id="location"
                   name="location"
                   defaultValue={profile?.location ?? ""}
                   maxLength={120}
-                  placeholder="Zagreb, Hrvatska"
+                  placeholder={tPage("locationPlaceholder")}
                   disabled={needsClaim}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="yearsExperience">Years of experience</Label>
+                <Label htmlFor="yearsExperience">{tPage("yearsLabel")}</Label>
                 <Input
                   id="yearsExperience"
                   name="yearsExperience"
@@ -215,27 +225,27 @@ export default async function GuideProfileSettingsPage({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="languages">Languages</Label>
+                <Label htmlFor="languages">{tPage("languagesLabel")}</Label>
                 <Input
                   id="languages"
                   name="languages"
                   defaultValue={languages}
                   maxLength={200}
-                  placeholder="Hrvatski, English, Deutsch"
+                  placeholder={tPage("languagesPlaceholder")}
                   disabled={needsClaim}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Separate with commas.
+                  {tPage("languagesHelp")}
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="website">Website</Label>
+                <Label htmlFor="website">{tPage("websiteLabel")}</Label>
                 <Input
                   id="website"
                   name="website"
                   defaultValue={profile?.website ?? ""}
                   maxLength={200}
-                  placeholder="yoursite.com"
+                  placeholder={tPage("websitePlaceholder")}
                   disabled={needsClaim}
                 />
               </div>
@@ -243,14 +253,105 @@ export default async function GuideProfileSettingsPage({
           </CardContent>
         </Card>
 
+        {/*
+          * What used to be spread across tour rows — price, group size, the
+          * kind of thing they do — now belongs to the guide, in one place.
+          */}
         <Card>
           <CardHeader>
-            <CardTitle>Contact</CardTitle>
+            <CardTitle>{tPage("workTitle")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone</Label>
+                <Label htmlFor="hourlyRate">{tPage("rateLabel")}</Label>
+                <Input
+                  id="hourlyRate"
+                  name="hourlyRate"
+                  type="number"
+                  min={0}
+                  max={10000}
+                  step="0.5"
+                  inputMode="decimal"
+                  defaultValue={profile?.hourly_rate ?? ""}
+                  placeholder={tPage("ratePlaceholder")}
+                  disabled={needsClaim}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {tPage("rateHelp")}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="maxGroupSize">{tPage("groupSizeLabel")}</Label>
+                <Input
+                  id="maxGroupSize"
+                  name="maxGroupSize"
+                  type="number"
+                  min={1}
+                  max={100}
+                  defaultValue={profile?.max_group_size ?? 6}
+                  disabled={needsClaim}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {tPage("groupSizeHelp")}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="defaultMeetingPoint">
+                {tPage("meetingPointLabel")}
+              </Label>
+              <Input
+                id="defaultMeetingPoint"
+                name="defaultMeetingPoint"
+                defaultValue={profile?.default_meeting_point ?? ""}
+                maxLength={200}
+                placeholder={tPage("meetingPointPlaceholder")}
+                disabled={needsClaim}
+              />
+              <p className="text-xs text-muted-foreground">
+                {tPage("meetingPointHelp")}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>{tPage("specialtiesLabel")}</Label>
+              <div className="flex flex-wrap gap-3">
+                {SPECIALTIES.map((specialty) => (
+                  <label
+                    key={specialty}
+                    className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm"
+                  >
+                    <input
+                      type="checkbox"
+                      name="specialties"
+                      value={specialty}
+                      defaultChecked={selectedSpecialties.includes(specialty)}
+                      disabled={needsClaim}
+                      className="size-4 accent-primary"
+                    />
+                    {t.has(`interests.${specialty}`)
+                      ? t(`interests.${specialty}`)
+                      : specialty}
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {tPage("specialtiesHelp")}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{tPage("contactTitle")}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="phone">{tPage("phoneLabel")}</Label>
                 <Input
                   id="phone"
                   name="phone"
@@ -260,11 +361,14 @@ export default async function GuideProfileSettingsPage({
                 />
               </div>
               <div className="space-y-2">
-                <Label>Email</Label>
-                <Input value={profile?.email ?? "—"} readOnly disabled />
+                <Label>{tPage("emailLabel")}</Label>
+                <Input
+                  value={profile?.email ?? t("empty")}
+                  readOnly
+                  disabled
+                />
                 <p className="text-xs text-muted-foreground">
-                  Your account email is used for bookings and cannot be changed
-                  here.
+                  {tPage("emailHelp")}
                 </p>
               </div>
             </div>
@@ -273,10 +377,10 @@ export default async function GuideProfileSettingsPage({
 
         <div className="flex flex-wrap gap-2">
           <Button type="submit" disabled={needsClaim}>
-            Save profile
+            {tPage("save")}
           </Button>
           <Button asChild variant="outline">
-            <Link href="/guide">Back to overview</Link>
+            <Link href="/guide">{tPage("backToOverview")}</Link>
           </Button>
         </div>
       </form>

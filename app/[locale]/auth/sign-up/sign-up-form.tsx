@@ -6,8 +6,10 @@ import { createClient } from "@/lib/supabase/client";
 import { savePendingAvatar } from "@/lib/supabase/pending-avatar";
 import { getFileFromFormData, uploadAvatarFile } from "@/lib/supabase/storage";
 import { Button } from "@/components/ui/button";
+import { AuthFlashError, AuthFlashMessage } from "@/lib/i18n/auth-flash";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useTranslations } from "next-intl";
 
 type Props = {
   locale: string;
@@ -20,6 +22,7 @@ function safePath(path: string, fallback: string) {
 }
 
 export function SignUpForm({ locale, redirectTo }: Props) {
+  const t = useTranslations("Auth.signUp");
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -43,7 +46,7 @@ export function SignUpForm({ locale, redirectTo }: Props) {
           if (!email || !password) {
             router.replace(
               `/${locale}/auth/sign-up?error=${encodeURIComponent(
-                "Email and password are required."
+                AuthFlashError.EmailPasswordRequired
               )}`
             );
             return;
@@ -52,7 +55,7 @@ export function SignUpForm({ locale, redirectTo }: Props) {
           if (!fullName) {
             router.replace(
               `/${locale}/auth/sign-up?error=${encodeURIComponent(
-                "Full name is required."
+                AuthFlashError.FullNameRequired
               )}`
             );
             return;
@@ -61,7 +64,7 @@ export function SignUpForm({ locale, redirectTo }: Props) {
           if (password !== confirmPassword) {
             router.replace(
               `/${locale}/auth/sign-up?error=${encodeURIComponent(
-                "Passwords do not match."
+                AuthFlashError.PasswordsMismatch
               )}`
             );
             return;
@@ -137,14 +140,14 @@ export function SignUpForm({ locale, redirectTo }: Props) {
 
           router.push(
             `/${locale}/auth/sign-in?message=${encodeURIComponent(
-              "Check your email to confirm your account."
+              AuthFlashMessage.CheckEmail
             )}`
           );
         });
       }}
     >
       <div className="space-y-2">
-        <Label htmlFor="fullName">Full name</Label>
+        <Label htmlFor="fullName">{t("fullNameLabel")}</Label>
         <Input
           id="fullName"
           name="fullName"
@@ -155,7 +158,7 @@ export function SignUpForm({ locale, redirectTo }: Props) {
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="avatarFile">Profile image (optional)</Label>
+        <Label htmlFor="avatarFile">{t("avatarLabel")}</Label>
         <Input
           id="avatarFile"
           name="avatarFile"
@@ -165,7 +168,7 @@ export function SignUpForm({ locale, redirectTo }: Props) {
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
+        <Label htmlFor="email">{t("emailLabel")}</Label>
         <Input
           id="email"
           name="email"
@@ -176,7 +179,7 @@ export function SignUpForm({ locale, redirectTo }: Props) {
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
+        <Label htmlFor="password">{t("passwordLabel")}</Label>
         <Input
           id="password"
           name="password"
@@ -187,7 +190,7 @@ export function SignUpForm({ locale, redirectTo }: Props) {
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="confirmPassword">Confirm password</Label>
+        <Label htmlFor="confirmPassword">{t("confirmPasswordLabel")}</Label>
         <Input
           id="confirmPassword"
           name="confirmPassword"
@@ -198,7 +201,7 @@ export function SignUpForm({ locale, redirectTo }: Props) {
         />
       </div>
       <Button type="submit" className="w-full" disabled={isPending}>
-        {isPending ? "Creating account..." : "Create account"}
+        {isPending ? t("submitting") : t("submit")}
       </Button>
     </form>
   );

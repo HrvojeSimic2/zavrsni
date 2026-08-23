@@ -1,33 +1,31 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { normalizeTime, slotDurationHours } from "@/lib/types/availability";
+
 export type ReservationStatus =
   | "pending"
   | "confirmed"
   | "cancelled"
   | "completed";
 
-export type GuideTour = {
+/** One block of the guide's opened time. Was `GuideEvent` over a tour date. */
+export type GuideSlot = {
   id: string;
-  title: string;
-  price: number | null;
-  category: string | null;
-  location: string | null;
-  rating: number | null;
-  reviewCount: number;
-};
-
-export type GuideEvent = {
-  tourId: string;
-  tourTitle: string;
   date: string;
-  availableSpots: number;
+  startTime: string;
+  endTime: string;
+  durationHours: number;
+  note: string | null;
+  booked: boolean;
 };
 
 export type GuideReservation = {
   id: string;
-  tourId: string | null;
-  tourTitle: string;
+  slotId: string | null;
   date: string;
+  startTime: string | null;
+  endTime: string | null;
+  durationHours: number | null;
   partySize: number;
   status: ReservationStatus;
   customerName: string | null;
@@ -37,26 +35,27 @@ export type GuideReservation = {
 };
 
 export type GuideMetrics = {
-  tourCount: number;
-  upcomingEventCount: number;
-  upcomingSpots: number;
+  openSlotCount: number;
+  bookedSlotCount: number;
+  /** Hours of open time still on the calendar in the window. */
+  openHours: number;
   upcomingReservationCount: number;
   upcomingGuests: number;
   pendingReservationCount: number;
-  bookedGuestsNext30: number;
+  /** Share of the time the guide opened that someone has taken. */
   fillRate: number | null;
   upcomingRevenue: number;
   revenueLast30: number;
   reservationsLast30: number;
   cancellationRate: number | null;
   currency: string;
+  hourlyRate: number | null;
   rating: number;
   reviewCount: number;
 };
 
 export type GuideDashboardData = {
-  tours: GuideTour[];
-  upcomingEvents: GuideEvent[];
+  upcomingSlots: GuideSlot[];
   upcomingReservations: GuideReservation[];
   recentReservations: GuideReservation[];
   metrics: GuideMetrics;
@@ -69,14 +68,7 @@ const RESERVATION_STATUSES: ReservationStatus[] = [
   "completed",
 ];
 
-/**
- * PostgREST returns an embedded relation as an object or as a single-element
- * array depending on how it infers the relationship, so normalize both.
- */
-function firstRelation<T>(value: T | T[] | null | undefined): T | null {
-  if (Array.isArray(value)) return value[0] ?? null;
-  return value ?? null;
-}
+const HOLDING_STATUSES = ["pending", "confirmed"];
 
 function toISODate(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -100,18 +92,15 @@ function toStatus(value: unknown): ReservationStatus {
 }
 
 /**
- * Revenue for a single reservation. `total_amount` is authoritative when the
- * booking recorded one; otherwise fall back to the tour's list price.
+ * Revenue for a single reservation.
+ *
+ * `total_amount` is the only source: it was computed from the rate at the time
+ * of booking, so a later rate change cannot rewrite history. A null means the
+ * guide had published no rate and the price is still to be agreed — counting
+ * that as anything but zero would invent revenue.
  */
-function reservationRevenue(
-  reservation: GuideReservation,
-  priceByTourId: Map<string, number>
-): number {
-  if (reservation.totalAmount !== null) return reservation.totalAmount;
-  const price = reservation.tourId
-    ? priceByTourId.get(reservation.tourId) ?? 0
-    : 0;
-  return price * Math.max(reservation.partySize, 1);
+function reservationRevenue(reservation: GuideReservation): number {
+  return reservation.totalAmount ?? 0;
 }
 
 function countsTowardRevenue(status: ReservationStatus): boolean {
@@ -119,8 +108,8 @@ function countsTowardRevenue(status: ReservationStatus): boolean {
 }
 
 /**
- * Loads everything the guide dashboard needs in one pass: tours, upcoming
- * availability, reservations on both sides of today, and the derived metrics.
+ * Loads everything the guide dashboard needs in one pass: the slots they have
+ * opened, reservations on both sides of today, and the derived metrics.
  *
  * Query failures are logged and degrade to empty data rather than throwing, so
  * a missing table (for example before migrations are applied) still renders a
@@ -129,10 +118,10 @@ function countsTowardRevenue(status: ReservationStatus): boolean {
 export async function fetchGuideDashboardData(
   supabase: SupabaseClient,
   guideId: string,
-  options?: { windowDays?: number; eventLimit?: number; reservationLimit?: number }
+  options?: { windowDays?: number; slotLimit?: number; reservationLimit?: number }
 ): Promise<GuideDashboardData> {
   const windowDays = Math.max(1, Math.min(options?.windowDays ?? 30, 365));
-  const eventLimit = options?.eventLimit ?? 200;
+  const slotLimit = options?.slotLimit ?? 200;
   const reservationLimit = options?.reservationLimit ?? 200;
 
   const now = new Date();
@@ -140,50 +129,29 @@ export async function fetchGuideDashboardData(
   const windowEnd = toISODate(addDays(now, windowDays));
   const windowStart = toISODate(addDays(now, -windowDays));
 
-  const { data: tourRows, error: toursError } = await supabase
-    .from("tours")
-    .select("id, title, price, category, location, rating, review_count")
-    .eq("guide_id", guideId)
-    .order("title", { ascending: true });
-
-  if (toursError) {
-    console.warn("[guide.dashboard] failed to load tours", toursError);
-  }
-
-  const tours: GuideTour[] = (
-    (tourRows ?? []) as Array<Record<string, unknown>>
-  ).map((row) => ({
-    id: String(row.id),
-    title: String(row.title ?? "Tour"),
-    price: row.price === null || row.price === undefined ? null : toNumber(row.price),
-    category: (row.category as string | null) ?? null,
-    location: (row.location as string | null) ?? null,
-    rating: row.rating === null || row.rating === undefined ? null : toNumber(row.rating),
-    reviewCount: toNumber(row.review_count),
-  }));
-
-  const tourIds = tours.map((tour) => tour.id);
-
-  const availabilityQuery = tourIds.length
-    ? supabase
-        .from("tour_availability")
-        .select("tour_id, date, available_spots, tour:tours ( id, title )")
-        .in("tour_id", tourIds)
-        .gte("date", today)
-        .lte("date", windowEnd)
-        .order("date", { ascending: true })
-        .limit(eventLimit)
-    : null;
-
   const [
-    { data: availabilityRows, error: availabilityError },
+    { data: guideRow, error: guideError },
+    { data: slotRows, error: slotsError },
     { data: reservationRows, error: reservationsError },
   ] = await Promise.all([
-    availabilityQuery ?? Promise.resolve({ data: [], error: null }),
+    supabase
+      .from("guides")
+      .select("hourly_rate, rating, review_count")
+      .eq("id", guideId)
+      .maybeSingle(),
+    supabase
+      .from("guide_availability")
+      .select("id, date, start_time, end_time, note")
+      .eq("guide_id", guideId)
+      .gte("date", today)
+      .lte("date", windowEnd)
+      .order("date", { ascending: true })
+      .order("start_time", { ascending: true })
+      .limit(slotLimit),
     supabase
       .from("reservations")
       .select(
-        "id, tour_id, date, party_size, status, customer_name, total_amount, currency, created_at, tour:tours ( id, title )"
+        "id, availability_id, date, start_time, end_time, duration_hours, party_size, status, customer_name, total_amount, currency, created_at"
       )
       .eq("guide_id", guideId)
       .gte("date", windowStart)
@@ -192,8 +160,11 @@ export async function fetchGuideDashboardData(
       .limit(reservationLimit),
   ]);
 
-  if (availabilityError) {
-    console.warn("[guide.dashboard] failed to load availability", availabilityError);
+  if (guideError) {
+    console.warn("[guide.dashboard] failed to load guide", guideError);
+  }
+  if (slotsError) {
+    console.warn("[guide.dashboard] failed to load slots", slotsError);
   }
   if (reservationsError) {
     if ((reservationsError as { code?: string } | null)?.code === "PGRST205") {
@@ -206,39 +177,25 @@ export async function fetchGuideDashboardData(
     }
   }
 
-  const titleByTourId = new Map(tours.map((tour) => [tour.id, tour.title]));
-  const priceByTourId = new Map(
-    tours.map((tour) => [tour.id, tour.price ?? 0] as const)
-  );
-
-  const upcomingEvents: GuideEvent[] = (
-    (availabilityRows ?? []) as Array<Record<string, unknown>>
-  ).map((row) => {
-    const tour = firstRelation(
-      row.tour as { id: string; title: string } | { id: string; title: string }[] | null
-    );
-    const tourId = String(row.tour_id);
-    return {
-      tourId,
-      tourTitle: tour?.title ?? titleByTourId.get(tourId) ?? "Tour",
-      date: String(row.date),
-      availableSpots: toNumber(row.available_spots),
-    };
-  });
-
   const allReservations: GuideReservation[] = (
     (reservationRows ?? []) as Array<Record<string, unknown>>
   ).map((row) => {
-    const tour = firstRelation(
-      row.tour as { id: string; title: string } | { id: string; title: string }[] | null
-    );
-    const tourId = row.tour_id ? String(row.tour_id) : null;
+    const startTime = normalizeTime(row.start_time) || null;
+    const endTime = normalizeTime(row.end_time) || null;
+    const duration =
+      row.duration_hours === null || row.duration_hours === undefined
+        ? startTime && endTime
+          ? slotDurationHours(startTime, endTime)
+          : null
+        : toNumber(row.duration_hours);
+
     return {
       id: String(row.id),
-      tourId,
-      tourTitle:
-        tour?.title ?? (tourId ? titleByTourId.get(tourId) : null) ?? "Tour",
+      slotId: row.availability_id ? String(row.availability_id) : null,
       date: String(row.date),
+      startTime,
+      endTime,
+      durationHours: duration,
       partySize: Math.max(toNumber(row.party_size, 1), 1),
       status: toStatus(row.status),
       customerName: (row.customer_name as string | null) ?? null,
@@ -248,6 +205,30 @@ export async function fetchGuideDashboardData(
           : toNumber(row.total_amount),
       currency: (row.currency as string | null) ?? null,
       createdAt: String(row.created_at ?? ""),
+    };
+  });
+
+  // A slot counts as taken while a live request sits on it.
+  const heldSlotIds = new Set(
+    allReservations
+      .filter((reservation) => HOLDING_STATUSES.includes(reservation.status))
+      .map((reservation) => reservation.slotId)
+      .filter((id): id is string => Boolean(id))
+  );
+
+  const upcomingSlots: GuideSlot[] = (
+    (slotRows ?? []) as Array<Record<string, unknown>>
+  ).map((row) => {
+    const startTime = normalizeTime(row.start_time);
+    const endTime = normalizeTime(row.end_time);
+    return {
+      id: String(row.id),
+      date: String(row.date),
+      startTime,
+      endTime,
+      durationHours: slotDurationHours(startTime, endTime),
+      note: (row.note as string | null) ?? null,
+      booked: heldSlotIds.has(String(row.id)),
     };
   });
 
@@ -263,82 +244,70 @@ export async function fetchGuideDashboardData(
     countsTowardRevenue(reservation.status)
   );
 
+  const openSlots = upcomingSlots.filter((slot) => !slot.booked);
+  const bookedSlots = upcomingSlots.filter((slot) => slot.booked);
+
+  const openHours = openSlots.reduce((sum, slot) => sum + slot.durationHours, 0);
+
   const upcomingGuests = upcomingReservations.reduce(
     (sum, reservation) => sum + reservation.partySize,
     0
   );
 
-  const bookedGuestsNext30 = activeUpcoming.reduce(
-    (sum, reservation) => sum + reservation.partySize,
-    0
-  );
-
-  const upcomingSpots = upcomingEvents.reduce(
-    (sum, event) => sum + event.availableSpots,
-    0
-  );
-
   const upcomingRevenue = activeUpcoming.reduce(
-    (sum, reservation) => sum + reservationRevenue(reservation, priceByTourId),
+    (sum, reservation) => sum + reservationRevenue(reservation),
     0
   );
 
   const revenueLast30 = recentReservations
     .filter((reservation) => countsTowardRevenue(reservation.status))
-    .reduce(
-      (sum, reservation) => sum + reservationRevenue(reservation, priceByTourId),
-      0
-    );
+    .reduce((sum, reservation) => sum + reservationRevenue(reservation), 0);
 
   const cancelledCount = allReservations.filter(
     (reservation) => reservation.status === "cancelled"
   ).length;
 
-  // Remaining spots plus already-booked guests approximates total capacity in
-  // the window, so this reads as "share of capacity that is sold".
-  const capacityNext30 = upcomingSpots + bookedGuestsNext30;
-
-  const reviewCount = tours.reduce((sum, tour) => sum + tour.reviewCount, 0);
-  const ratingNumerator = tours.reduce(
-    (sum, tour) => sum + (tour.rating ?? 0) * tour.reviewCount,
-    0
-  );
-  const ratedTours = tours.filter((tour) => (tour.rating ?? 0) > 0);
-  const rating =
-    reviewCount > 0
-      ? ratingNumerator / reviewCount
-      : ratedTours.length > 0
-        ? ratedTours.reduce((sum, tour) => sum + (tour.rating ?? 0), 0) /
-          ratedTours.length
-        : 0;
+  // "How much of the time I opened is taken" — a ratio of slots, which is what
+  // the guide actually controls. The old version divided guests by leftover
+  // seats, which only meant something for a fixed-capacity tour.
+  const totalSlots = upcomingSlots.length;
 
   const currency =
     allReservations.find((reservation) => reservation.currency)?.currency ?? "EUR";
 
+  const rawRate = (guideRow as { hourly_rate?: number | null } | null)?.hourly_rate;
+  const hourlyRate =
+    rawRate === null || rawRate === undefined || toNumber(rawRate) <= 0
+      ? null
+      : toNumber(rawRate);
+
   const metrics: GuideMetrics = {
-    tourCount: tours.length,
-    upcomingEventCount: upcomingEvents.length,
-    upcomingSpots,
+    openSlotCount: openSlots.length,
+    bookedSlotCount: bookedSlots.length,
+    openHours,
     upcomingReservationCount: upcomingReservations.length,
     upcomingGuests,
     pendingReservationCount: upcomingReservations.filter(
       (reservation) => reservation.status === "pending"
     ).length,
-    bookedGuestsNext30,
-    fillRate: capacityNext30 > 0 ? bookedGuestsNext30 / capacityNext30 : null,
+    fillRate: totalSlots > 0 ? bookedSlots.length / totalSlots : null,
     upcomingRevenue,
     revenueLast30,
     reservationsLast30: recentReservations.length,
     cancellationRate:
       allReservations.length > 0 ? cancelledCount / allReservations.length : null,
     currency,
-    rating: Number(rating.toFixed(2)),
-    reviewCount,
+    hourlyRate,
+    rating: Number(
+      ((guideRow as { rating?: number | null } | null)?.rating ?? 0)
+    ),
+    reviewCount: Number(
+      ((guideRow as { review_count?: number | null } | null)?.review_count ?? 0)
+    ),
   };
 
   return {
-    tours,
-    upcomingEvents,
+    upcomingSlots,
     upcomingReservations,
     recentReservations,
     metrics,

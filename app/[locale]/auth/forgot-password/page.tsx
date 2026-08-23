@@ -1,9 +1,12 @@
+import { getTranslations } from "next-intl/server";
+
 import { forgotPasswordAction } from "../actions";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { resolveFlash } from "@/lib/i18n/flash";
 
 type PageProps = {
   params: { locale: string } | Promise<{ locale: string }>;
@@ -16,22 +19,28 @@ export default async function ForgotPasswordPage({
 }: PageProps) {
   const { locale } = await Promise.resolve(params);
   const resolvedSearchParams = await Promise.resolve(searchParams);
-  const error =
+  const tAuth = await getTranslations("Auth");
+  const t = await getTranslations("Auth.forgot");
+  const error = resolveFlash(
+    tAuth,
+    "errors",
     typeof resolvedSearchParams?.error === "string"
       ? resolvedSearchParams.error
-      : "";
-  const message =
+      : ""
+  );
+  const message = resolveFlash(
+    tAuth,
+    "messages",
     typeof resolvedSearchParams?.message === "string"
       ? resolvedSearchParams.message
-      : "";
+      : ""
+  );
 
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
-        <CardTitle>Reset your password</CardTitle>
-        <CardDescription>
-          Enter your email and we will send a reset link.
-        </CardDescription>
+        <CardTitle>{t("title")}</CardTitle>
+        <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {error ? (
@@ -47,7 +56,7 @@ export default async function ForgotPasswordPage({
         <form action={forgotPasswordAction} className="space-y-4">
           <input type="hidden" name="locale" value={locale} />
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email">{t("emailLabel")}</Label>
             <Input
               id="email"
               name="email"
@@ -57,15 +66,15 @@ export default async function ForgotPasswordPage({
             />
           </div>
           <Button type="submit" className="w-full">
-            Send reset link
+            {t("submit")}
           </Button>
         </form>
       </CardContent>
       <CardFooter className="flex flex-col text-sm text-muted-foreground">
         <span>
-          Remembered your password?{" "}
+          {t("remembered")}{" "}
           <Link href="/auth/sign-in" className="text-primary hover:underline">
-            Sign in
+            {t("signInLink")}
           </Link>
         </span>
       </CardFooter>

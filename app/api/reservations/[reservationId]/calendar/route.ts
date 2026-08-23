@@ -1,3 +1,6 @@
+import { getTranslations } from "next-intl/server";
+
+import { defaultLocale, locales } from "@/i18n/routing";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -39,38 +42,43 @@ function toUTCStamp(date: Date): string {
 }
 
 /**
- * Local wall-clock timestamp. The tour's start time is local to where the tour
- * runs, and without a per-tour timezone the honest encoding is a floating time:
- * it means "10:00 where you are standing", which is what a meeting point implies.
+ * Local wall-clock timestamp. The slot's start time is local to where the guide
+ * works, and without a per-guide timezone the honest encoding is a floating
+ * time: it means "10:00 where you are standing", which is what a meeting point
+ * implies.
  */
 function toFloatingStamp(dateISO: string, time: string): string {
   const [hh, mm] = time.split(":");
   return `${dateISO.replace(/-/g, "")}T${hh}${mm}00`;
 }
 
+/** HH:MM from a Postgres `time`, or "" when there is nothing usable. */
+function readTime(value: unknown): string {
+  const match = /^(\d{1,2}):(\d{2})/.exec(String(value ?? "").trim());
+  return match ? `${match[1].padStart(2, "0")}:${match[2]}` : "";
+}
+
 /**
- * Turns free-text duration ("4-6 sati", "2.5 hours", "90 min") into minutes.
- *
- * For a range the longer end wins: a calendar block that ends before the tour
- * does is worse than one that reserves a little too much.
+ * How long to block out. The slot's own start and end are authoritative;
+ * `duration_hours` is the fallback for bookings made before slots existed.
  */
-function parseDurationMinutes(raw: string | null | undefined): number {
-  const text = String(raw ?? "").trim();
-  const matches = text.match(/\d+(?:[.,]\d+)?/g);
-  if (!matches) return DEFAULT_DURATION_HOURS * 60;
+function durationMinutes(
+  startTime: string,
+  endTime: string,
+  durationHours: unknown
+): number {
+  if (startTime && endTime) {
+    const [sh, sm] = startTime.split(":").map(Number);
+    const [eh, em] = endTime.split(":").map(Number);
+    const minutes = eh * 60 + em - (sh * 60 + sm);
+    if (minutes > 0) return Math.min(minutes, 12 * 60);
+  }
 
-  const values = matches
-    .map((value) => Number(value.replace(",", ".")))
-    .filter((value) => Number.isFinite(value) && value > 0);
-
-  if (values.length === 0) return DEFAULT_DURATION_HOURS * 60;
-
-  const longest = Math.max(...values);
-  const isMinutes = /\bmin/i.test(text) && !/\b(h|hour|sat)/i.test(text);
-  const minutes = isMinutes ? longest : longest * 60;
-
-  // Guard against a stray number in the text producing a week-long event.
-  return Math.min(Math.max(Math.round(minutes), 30), 12 * 60);
+  const hours = Number(durationHours);
+  if (Number.isFinite(hours) && hours > 0) {
+    return Math.min(Math.round(hours * 60), 12 * 60);
+  }
+  return DEFAULT_DURATION_HOURS * 60;
 }
 
 function addMinutes(dateISO: string, time: string, minutes: number): string {
@@ -85,11 +93,23 @@ function addMinutes(dateISO: string, time: string, minutes: number): string {
   return toFloatingStamp(end.toISOString().slice(0, 10), endTime);
 }
 
+/**
+ * This route sits outside the `[locale]` segment, so the caller passes the
+ * locale it is rendering in as a query param.
+ */
+function resolveLocale(value: string | null) {
+  return value && (locales as readonly string[]).includes(value)
+    ? value
+    : defaultLocale;
+}
+
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ reservationId: string }> }
 ) {
   const { reservationId } = await params;
+  const locale = resolveLocale(new URL(req.url).searchParams.get("locale"));
+  const t = await getTranslations({ locale, namespace: "Calendar" });
 
   const supabase = await createClient();
   const {
@@ -98,7 +118,7 @@ export async function GET(
   } = await supabase.auth.getUser();
 
   if (userError || !user) {
-    return new Response("Sign in to download this booking.", { status: 401 });
+    return new Response(t("errSignIn"), { status: 401 });
   }
 
   // RLS already limits this row to the traveller who booked it and the guide
@@ -106,35 +126,26 @@ export async function GET(
   const { data, error } = await supabase
     .from("reservations")
     .select(
-      "id, date, party_size, status, customer_name, tour:tours ( id, title, description, location, country, meeting_point, start_time, duration ), guide:guides ( id, name, email, phone )"
+      "id, date, start_time, end_time, duration_hours, party_size, status, customer_name, meeting_point, guide:guides ( id, name, email, phone, location )"
     )
     .eq("id", reservationId)
     .maybeSingle();
 
   if (error) {
     console.warn("[reservation.calendar] failed to load reservation", error);
-    return new Response("Failed to load the booking.", { status: 500 });
+    return new Response(t("errLoadFailed"), { status: 500 });
   }
   if (!data) {
-    return new Response("Booking not found.", { status: 404 });
+    return new Response(t("errNotFound"), { status: 404 });
   }
 
   const reservation = data as Record<string, unknown>;
   const status = String(reservation.status ?? "pending");
 
   if (status !== "confirmed" && status !== "completed") {
-    return new Response(
-      "This booking is not confirmed yet, so there is nothing to add to a calendar.",
-      { status: 409 }
-    );
+    return new Response(t("errNotConfirmed"), { status: 409 });
   }
 
-  const tour = firstRelation(
-    reservation.tour as
-      | Record<string, unknown>
-      | Record<string, unknown>[]
-      | null
-  );
   const guide = firstRelation(
     reservation.guide as
       | Record<string, unknown>
@@ -143,45 +154,46 @@ export async function GET(
   );
 
   const dateISO = String(reservation.date);
-  const rawStart = tour?.start_time ? String(tour.start_time) : "";
-  const startTime = /^\d{2}:\d{2}/.test(rawStart)
-    ? rawStart.slice(0, 5)
-    : DEFAULT_START_TIME;
+  const startTime = readTime(reservation.start_time) || DEFAULT_START_TIME;
+  const endTime = readTime(reservation.end_time);
 
-  const title = String(tour?.title ?? "Tour");
-  const guideName = String(guide?.name ?? "your guide");
+  const guideName = String(guide?.name ?? t("fallbackGuideName"));
+  // The event is time with a person, so that is what the calendar entry says.
+  const title = t("summaryWithGuide", { name: guideName });
 
-  const place = [tour?.meeting_point, tour?.location, tour?.country]
-    .map((part) => String(part ?? "").trim())
+  const meetingPoint = String(reservation.meeting_point ?? "").trim();
+  const place = [meetingPoint, String(guide?.location ?? "").trim()]
     .filter(Boolean)
     .join(", ");
 
+  const minutes = durationMinutes(
+    startTime,
+    endTime,
+    reservation.duration_hours
+  );
+
   const descriptionLines = [
-    `Guide: ${guideName}`,
-    `Guests: ${Number(reservation.party_size ?? 1)}`,
-    tour?.meeting_point ? `Meeting point: ${String(tour.meeting_point)}` : null,
-    tour?.duration ? `Duration: ${String(tour.duration)}` : null,
-    guide?.email ? `Guide email: ${String(guide.email)}` : null,
-    guide?.phone ? `Guide phone: ${String(guide.phone)}` : null,
+    t("guide", { name: guideName }),
+    t("guests", { count: Number(reservation.party_size ?? 1) }),
+    meetingPoint ? t("meetingPoint", { place: meetingPoint }) : null,
+    t("durationHours", { count: Math.round((minutes / 60) * 10) / 10 }),
+    guide?.email ? t("guideEmail", { email: String(guide.email) }) : null,
+    guide?.phone ? t("guidePhone", { phone: String(guide.phone) }) : null,
     "",
-    "Booked through LocalPath.",
+    t("bookedThrough"),
   ].filter((line): line is string => line !== null);
 
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//LocalPath//Booking//EN",
+    "PRODID:-//Peregrine//Booking//EN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     "BEGIN:VEVENT",
-    `UID:reservation-${escapeICS(String(reservation.id))}@localpath`,
+    `UID:reservation-${escapeICS(String(reservation.id))}@peregrine`,
     `DTSTAMP:${toUTCStamp(new Date())}`,
     `DTSTART:${toFloatingStamp(dateISO, startTime)}`,
-    `DTEND:${addMinutes(
-      dateISO,
-      startTime,
-      parseDurationMinutes(tour?.duration as string | null)
-    )}`,
+    `DTEND:${addMinutes(dateISO, startTime, minutes)}`,
     `SUMMARY:${escapeICS(title)}`,
     place ? `LOCATION:${escapeICS(place)}` : null,
     `DESCRIPTION:${escapeICS(descriptionLines.join("\n"))}`,
@@ -189,14 +201,14 @@ export async function GET(
     "BEGIN:VALARM",
     "TRIGGER:-PT2H",
     "ACTION:DISPLAY",
-    `DESCRIPTION:${escapeICS(`${title} starts in 2 hours`)}`,
+    `DESCRIPTION:${escapeICS(t("reminder", { title }))}`,
     "END:VALARM",
     "END:VEVENT",
     "END:VCALENDAR",
   ].filter((line): line is string => line !== null);
 
   const body = lines.map(foldLine).join("\r\n");
-  const filename = `localpath-${dateISO}.ics`;
+  const filename = `peregrine-${dateISO}.ics`;
 
   return new Response(body, {
     headers: {

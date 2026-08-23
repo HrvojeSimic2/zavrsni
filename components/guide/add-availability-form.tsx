@@ -5,45 +5,44 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { addAvailabilityAction } from "@/app/[locale]/guide/events/actions";
-
-type TourOption = { id: string; title: string; groupSize: string | null };
+import { addSlotsAction } from "@/app/[locale]/guide/events/actions";
+import { useTranslations } from "next-intl";
 
 type Props = {
   locale: string;
-  tours: TourOption[];
   disabled?: boolean;
 };
 
 const WEEKDAYS = [
-  { value: "1", label: "Mon" },
-  { value: "2", label: "Tue" },
-  { value: "3", label: "Wed" },
-  { value: "4", label: "Thu" },
-  { value: "5", label: "Fri" },
-  { value: "6", label: "Sat" },
-  { value: "0", label: "Sun" },
-];
+  { value: "1", labelKey: "mon" },
+  { value: "2", labelKey: "tue" },
+  { value: "3", labelKey: "wed" },
+  { value: "4", labelKey: "thu" },
+  { value: "5", labelKey: "fri" },
+  { value: "6", labelKey: "sat" },
+  { value: "0", labelKey: "sun" },
+] as const;
 
-function defaultSpots(groupSize: string | null): number {
-  const match = String(groupSize ?? "").match(/\d+/);
-  const parsed = match ? Number(match[0]) : NaN;
-  return Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 100) : 8;
-}
+/** The blocks guides reach for most, so the common case is two clicks. */
+const PRESETS = [
+  { labelKey: "morning", start: "09:00", end: "12:00" },
+  { labelKey: "afternoon", start: "14:00", end: "17:00" },
+  { labelKey: "fullDay", start: "09:00", end: "17:00" },
+] as const;
 
-export function AddAvailabilityForm({ locale, tours, disabled }: Props) {
+/**
+ * Opens slots on the guide's calendar.
+ *
+ * No tour to pick and no capacity to set: a slot is a block of this guide's
+ * time, and whoever books it books all of it.
+ */
+export function AddAvailabilityForm({ locale, disabled }: Props) {
+  const t = useTranslations("GuideDashboard.availabilityForm");
   const today = new Date().toISOString().slice(0, 10);
-  const [tourId, setTourId] = useState(tours[0]?.id ?? "");
-  const [selectedWeekdays, setSelectedWeekdays] = useState<string[]>([]);
 
-  const selectedTour = tours.find((tour) => tour.id === tourId) ?? tours[0];
+  const [startTime, setStartTime] = useState("09:00");
+  const [endTime, setEndTime] = useState("12:00");
+  const [selectedWeekdays, setSelectedWeekdays] = useState<string[]>([]);
 
   const toggleWeekday = (value: string) => {
     setSelectedWeekdays((current) =>
@@ -53,59 +52,77 @@ export function AddAvailabilityForm({ locale, tours, disabled }: Props) {
     );
   };
 
-  if (tours.length === 0) {
-    return (
-      <div className="rounded-lg border border-dashed bg-muted/10 p-4 text-sm text-muted-foreground">
-        Create a tour first, then you can open dates for it.
-      </div>
-    );
-  }
+  const timesInvalid = endTime <= startTime;
 
   return (
-    <form action={addAvailabilityAction} className="space-y-4">
+    <form action={addSlotsAction} className="space-y-4">
       <input type="hidden" name="locale" value={locale} />
-      <input type="hidden" name="tourId" value={tourId} />
       {selectedWeekdays.map((value) => (
         <input key={value} type="hidden" name="weekdays" value={value} />
       ))}
 
+      <div className="space-y-2">
+        <Label>{t("presetLabel")}</Label>
+        <div className="flex flex-wrap gap-2">
+          {PRESETS.map((preset) => {
+            const active =
+              preset.start === startTime && preset.end === endTime;
+            return (
+              <Button
+                key={preset.labelKey}
+                type="button"
+                size="sm"
+                variant={active ? "default" : "outline"}
+                className="rounded-full"
+                disabled={disabled}
+                aria-pressed={active}
+                onClick={() => {
+                  setStartTime(preset.start);
+                  setEndTime(preset.end);
+                }}
+              >
+                {t(`presets.${preset.labelKey}`)}
+              </Button>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="tour">Tour</Label>
-          <Select value={tourId} onValueChange={setTourId} disabled={disabled}>
-            <SelectTrigger id="tour">
-              <SelectValue placeholder="Pick a tour" />
-            </SelectTrigger>
-            <SelectContent>
-              {tours.map((tour) => (
-                <SelectItem key={tour.id} value={tour.id}>
-                  {tour.title}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="spots">Spots per date</Label>
+          <Label htmlFor="startTime">{t("startTimeLabel")}</Label>
           <Input
-            id="spots"
-            name="spots"
-            type="number"
-            min={1}
-            max={100}
+            id="startTime"
+            name="startTime"
+            type="time"
             required
+            step={900}
             disabled={disabled}
-            defaultValue={defaultSpots(selectedTour?.groupSize ?? null)}
-            key={selectedTour?.id}
+            value={startTime}
+            onChange={(event) => setStartTime(event.target.value)}
           />
-          <p className="text-xs text-muted-foreground">
-            Total capacity for the day. Existing bookings stay reserved.
-          </p>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="startDate">From</Label>
+          <Label htmlFor="endTime">{t("endTimeLabel")}</Label>
+          <Input
+            id="endTime"
+            name="endTime"
+            type="time"
+            required
+            step={900}
+            disabled={disabled}
+            value={endTime}
+            onChange={(event) => setEndTime(event.target.value)}
+            aria-invalid={timesInvalid}
+          />
+          {timesInvalid ? (
+            <p className="text-xs text-destructive">{t("endAfterStart")}</p>
+          ) : null}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="startDate">{t("fromLabel")}</Label>
           <Input
             id="startDate"
             name="startDate"
@@ -118,7 +135,7 @@ export function AddAvailabilityForm({ locale, tours, disabled }: Props) {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="endDate">To (optional)</Label>
+          <Label htmlFor="endDate">{t("toLabel")}</Label>
           <Input
             id="endDate"
             name="endDate"
@@ -126,14 +143,12 @@ export function AddAvailabilityForm({ locale, tours, disabled }: Props) {
             min={today}
             disabled={disabled}
           />
-          <p className="text-xs text-muted-foreground">
-            Leave empty to open a single date.
-          </p>
+          <p className="text-xs text-muted-foreground">{t("toHelp")}</p>
         </div>
       </div>
 
       <div className="space-y-2">
-        <Label>Only these weekdays (optional)</Label>
+        <Label>{t("weekdaysLabel")}</Label>
         <div className="flex flex-wrap gap-2">
           {WEEKDAYS.map((day) => {
             const active = selectedWeekdays.includes(day.value);
@@ -148,18 +163,29 @@ export function AddAvailabilityForm({ locale, tours, disabled }: Props) {
                 onClick={() => toggleWeekday(day.value)}
                 aria-pressed={active}
               >
-                {day.label}
+                {t(`weekdays.${day.labelKey}`)}
               </Button>
             );
           })}
         </div>
-        <p className="text-xs text-muted-foreground">
-          Nothing selected means every day in the range.
-        </p>
+        <p className="text-xs text-muted-foreground">{t("weekdaysHelp")}</p>
       </div>
 
-      <Button type="submit" disabled={disabled}>
-        Open dates
+      <div className="space-y-2">
+        <Label htmlFor="note">{t("noteLabel")}</Label>
+        <Input
+          id="note"
+          name="note"
+          type="text"
+          maxLength={120}
+          disabled={disabled}
+          placeholder={t("notePlaceholder")}
+        />
+        <p className="text-xs text-muted-foreground">{t("noteHelp")}</p>
+      </div>
+
+      <Button type="submit" disabled={disabled || timesInvalid}>
+        {t("submit")}
       </Button>
     </form>
   );

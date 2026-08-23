@@ -1,7 +1,5 @@
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   MapPin,
   Users,
@@ -9,199 +7,112 @@ import {
   Heart,
   ArrowRight,
   Compass,
-  Star,
-  Sparkles,
+  CalendarCheck,
+  type LucideIcon,
 } from "lucide-react";
 import { Link } from "@/i18n/routing";
-import Image from "next/image";
 import { getTranslations } from "next-intl/server";
 import { HeroSection } from "@/components/homepage/hero-section";
 import { getHomepageGuidesData } from "@/lib/actions/guide-actions";
 import { GuideSpotlight } from "@/components/homepage/guide-spotlight";
 
+const VALUE_PROPS: { icon: LucideIcon; titleKey: string; bodyKey: string }[] = [
+  { icon: Compass, titleKey: "whyHiddenTitle", bodyKey: "whyHiddenBody" },
+  { icon: Shield, titleKey: "whyVerifiedTitle", bodyKey: "whyVerifiedBody" },
+  { icon: Users, titleKey: "whyPassionateTitle", bodyKey: "whyPassionateBody" },
+  { icon: Heart, titleKey: "whyImpactTitle", bodyKey: "whyImpactBody" },
+];
+
+const GUIDE_BENEFITS: {
+  icon: LucideIcon;
+  titleKey: string;
+  bodyKey: string;
+}[] = [
+  {
+    icon: CalendarCheck,
+    titleKey: "guideFeature1Title",
+    bodyKey: "guideFeature1Body",
+  },
+  { icon: MapPin, titleKey: "guideFeature2Title", bodyKey: "guideFeature2Body" },
+  { icon: Shield, titleKey: "guideFeature3Title", bodyKey: "guideFeature3Body" },
+  { icon: Heart, titleKey: "guideFeature4Title", bodyKey: "guideFeature4Body" },
+];
+
+
 export default async function HomePage() {
   const t = await getTranslations("Home");
   const spotlightGuides = await getHomepageGuidesData();
-  const whySection = (
-    <section className="py-24 lg:py-32 relative overflow-hidden">
-      <div className="absolute right-0 top-1/3 w-96 h-96 bg-primary/3 rounded-full blur-3xl" />
 
+  const whySection = (
+    <section className="border-b py-16 md:py-24">
       <div className="container">
-        <div className="text-center mb-16 space-y-4 max-w-2xl mx-auto">
-          <h2 className="text-4xl md:text-6xl font-bold text-balance">
+        <div className="max-w-2xl space-y-3">
+          <h2 className="text-3xl md:text-4xl font-semibold tracking-tight text-balance">
             {t("whyChooseUs")}
           </h2>
-          <p className="text-lg text-muted-foreground text-pretty">
+          <p className="text-base md:text-lg text-muted-foreground leading-relaxed text-pretty">
             {t("whySubtitle")}
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-          <div className="space-y-8">
-            <Card className="relative overflow-hidden border-2 hover:border-primary/40 transition-all duration-300 hover:shadow-xl hover:-translate-y-2 rounded-3xl group">
-              <CardContent className="pt-10 pb-8 px-8 space-y-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-linear-to-br from-primary/10 to-primary/5 group-hover:from-primary/20 group-hover:to-primary/10 transition-all duration-300">
-                  <Compass className="h-8 w-8 text-primary" />
-                </div>
-                <div className="space-y-3">
-                  <h3 className="font-bold text-2xl">{t("whyHiddenTitle")}</h3>
-                  <p className="text-muted-foreground leading-relaxed">
-                    {t("whyHiddenBody")}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="relative overflow-hidden border-2 hover:border-secondary/40 transition-all duration-300 hover:shadow-xl hover:-translate-y-2 rounded-3xl group md:ml-8">
-              <CardContent className="pt-10 pb-8 px-8 space-y-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-linear-to-br from-secondary/10 to-secondary/5 group-hover:from-secondary/20 group-hover:to-secondary/10 transition-all duration-300">
-                  <Shield className="h-8 w-8 text-secondary" />
-                </div>
-                <div className="space-y-3">
-                  <h3 className="font-bold text-2xl">
-                    {t("whyVerifiedTitle")}
-                  </h3>
-                  <p className="text-muted-foreground leading-relaxed">
-                    {t("whyVerifiedBody")}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="space-y-8 md:pt-12">
-            <Card className="relative overflow-hidden border-2 hover:border-primary/40 transition-all duration-300 hover:shadow-xl hover:-translate-y-2 rounded-3xl group">
-              <CardContent className="pt-10 pb-8 px-8 space-y-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-linear-to-br from-primary/10 to-secondary/10 group-hover:from-primary/20 group-hover:to-secondary/20 transition-all duration-300">
-                  <Users className="h-8 w-8 text-primary" />
-                </div>
-                <div className="space-y-3">
-                  <h3 className="font-bold text-2xl">
-                    {t("whyPassionateTitle")}
-                  </h3>
-                  <p className="text-muted-foreground leading-relaxed">
-                    {t("whyPassionateBody")}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="relative overflow-hidden border-2 hover:border-secondary/40 transition-all duration-300 hover:shadow-xl hover:-translate-y-2 rounded-3xl group md:mr-8">
-              <CardContent className="pt-10 pb-8 px-8 space-y-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-linear-to-br from-secondary/10 to-primary/10 group-hover:from-secondary/20 group-hover:to-primary/20 transition-all duration-300">
-                  <Heart className="h-8 w-8 text-secondary" />
-                </div>
-                <div className="space-y-3">
-                  <h3 className="font-bold text-2xl">{t("whyImpactTitle")}</h3>
-                  <p className="text-muted-foreground leading-relaxed">
-                    {t("whyImpactBody")}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {VALUE_PROPS.map(({ icon: Icon, titleKey, bodyKey }) => (
+            <div
+              key={titleKey}
+              className="rounded-xl border bg-card p-6 hover:border-primary/50 transition-colors duration-200"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                <Icon className="h-5 w-5 text-primary" aria-hidden="true" />
+              </div>
+              <h3 className="mt-5 text-lg font-semibold">{t(titleKey)}</h3>
+              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                {t(bodyKey)}
+              </p>
+            </div>
+          ))}
         </div>
       </div>
     </section>
   );
 
   const guideCtaSection = (
-    <section className="relative overflow-hidden bg-linear-to-br from-primary via-primary to-primary/90">
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -right-48 top-0 h-96 w-96 rounded-full bg-primary-foreground/5 blur-3xl" />
-        <div className="absolute -left-48 bottom-0 h-[600px] w-[600px] rounded-full bg-primary-foreground/5 blur-3xl" />
-        <div className="absolute right-1/4 bottom-1/4 h-64 w-64 rounded-full bg-primary-foreground/3 blur-2xl" />
-      </div>
-
-      <div className="container relative py-20 md:py-32">
-        <div className="max-w-4xl mx-auto text-center space-y-12">
-          <div className="space-y-8">
-            <Badge className="bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 border-primary-foreground/20 rounded-full px-4 py-1.5 inline-flex items-center gap-2">
-              <Sparkles className="h-3.5 w-3.5" />
+    <section className="bg-brand-deep text-brand-deep-foreground">
+      <div className="container py-16 md:py-24">
+        <div className="grid grid-cols-1 gap-12 lg:grid-cols-2 lg:gap-16 lg:items-start">
+          <div className="space-y-5">
+            <p className="text-sm font-medium uppercase tracking-widest text-brand-deep-foreground/80">
               {t("guideBadge")}
-            </Badge>
-
-            <div className="space-y-6">
-              <h2 className="text-4xl md:text-6xl font-bold text-primary-foreground text-balance leading-tight">
-                {t("guideTitle")}
-              </h2>
-              <p className="text-xl text-primary-foreground/90 leading-relaxed text-pretty max-w-2xl mx-auto">
-                {t("guideBody")}
-              </p>
+            </p>
+            <h2 className="text-3xl md:text-4xl font-semibold tracking-tight text-balance leading-tight">
+              {t("guideTitle")}
+            </h2>
+            <p className="max-w-xl text-base md:text-lg text-brand-deep-foreground/90 leading-relaxed text-pretty">
+              {t("guideBody")}
+            </p>
+            <div className="pt-2">
+              <Button size="lg" variant="secondary" asChild>
+                <Link href="/become-guide">
+                  {t("guideCta")}
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 max-w-5xl mx-auto">
-            <div className="flex flex-col items-center gap-4 bg-primary-foreground/5 p-6 rounded-3xl backdrop-blur-sm hover:bg-primary-foreground/10 transition-all duration-300 hover:-translate-y-2 hover:shadow-xl">
-              <div className="shrink-0 w-16 h-16 rounded-2xl bg-primary-foreground/15 flex items-center justify-center">
-                <MapPin className="h-8 w-8 text-primary-foreground" />
+          <dl className="grid grid-cols-1 gap-x-8 gap-y-8 sm:grid-cols-2">
+            {GUIDE_BENEFITS.map(({ icon: Icon, titleKey, bodyKey }) => (
+              <div key={titleKey} className="border-t border-brand-deep-foreground/25 pt-5">
+                <Icon
+                  className="h-5 w-5 text-brand-deep-foreground/80"
+                  aria-hidden="true"
+                />
+                <dt className="mt-3 font-semibold">{t(titleKey)}</dt>
+                <dd className="mt-1 text-sm text-brand-deep-foreground/90 leading-relaxed">
+                  {t(bodyKey)}
+                </dd>
               </div>
-              <div className="text-center">
-                <p className="font-semibold text-primary-foreground text-lg">
-                  {t("guideFeature1Title")}
-                </p>
-                <p className="text-sm text-primary-foreground/80 mt-1">
-                  {t("guideFeature1Body")}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-col items-center gap-4 bg-primary-foreground/5 p-6 rounded-3xl backdrop-blur-sm hover:bg-primary-foreground/10 transition-all duration-300 hover:-translate-y-2 hover:shadow-xl">
-              <div className="shrink-0 w-16 h-16 rounded-2xl bg-primary-foreground/15 flex items-center justify-center">
-                <Users className="h-8 w-8 text-primary-foreground" />
-              </div>
-              <div className="text-center">
-                <p className="font-semibold text-primary-foreground text-lg">
-                  {t("guideFeature2Title")}
-                </p>
-                <p className="text-sm text-primary-foreground/80 mt-1">
-                  {t("guideFeature2Body")}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-col items-center gap-4 bg-primary-foreground/5 p-6 rounded-3xl backdrop-blur-sm hover:bg-primary-foreground/10 transition-all duration-300 hover:-translate-y-2 hover:shadow-xl">
-              <div className="shrink-0 w-16 h-16 rounded-2xl bg-primary-foreground/15 flex items-center justify-center">
-                <Shield className="h-8 w-8 text-primary-foreground" />
-              </div>
-              <div className="text-center">
-                <p className="font-semibold text-primary-foreground text-lg">
-                  {t("guideFeature3Title")}
-                </p>
-                <p className="text-sm text-primary-foreground/80 mt-1">
-                  {t("guideFeature3Body")}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-col items-center gap-4 bg-primary-foreground/5 p-6 rounded-3xl backdrop-blur-sm hover:bg-primary-foreground/10 transition-all duration-300 hover:-translate-y-2 hover:shadow-xl">
-              <div className="shrink-0 w-16 h-16 rounded-2xl bg-primary-foreground/15 flex items-center justify-center">
-                <Heart className="h-8 w-8 text-primary-foreground" />
-              </div>
-              <div className="text-center">
-                <p className="font-semibold text-primary-foreground text-lg">
-                  {t("guideFeature4Title")}
-                </p>
-                <p className="text-sm text-primary-foreground/80 mt-1">
-                  {t("guideFeature4Body")}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-6">
-            <Button
-              size="lg"
-              variant="secondary"
-              className="rounded-full text-base px-8"
-              asChild
-            >
-              <Link href="/become-guide">
-                {t("guideCta")}
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
-            </Button>
-          </div>
+            ))}
+          </dl>
         </div>
       </div>
     </section>

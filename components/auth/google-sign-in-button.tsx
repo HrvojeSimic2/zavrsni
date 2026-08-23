@@ -1,10 +1,13 @@
+import { getTranslations } from "next-intl/server";
+
 import { signInWithGoogleAction } from "@/app/[locale]/auth/actions";
 import { Button } from "@/components/ui/button";
 
 type Props = {
   locale: string;
   redirectTo: string;
-  label?: string;
+  /** Message key inside the `Auth` namespace. */
+  labelKey?: "continueWithGoogle" | "signUpWithGoogle";
 };
 
 function GoogleIcon() {
@@ -30,29 +33,33 @@ function GoogleIcon() {
   );
 }
 
-export function GoogleSignInButton({
+export async function GoogleSignInButton({
   locale,
   redirectTo,
-  label = "Continue with Google",
+  labelKey = "continueWithGoogle",
 }: Props) {
+  const t = await getTranslations("Auth");
+
   return (
     <form action={signInWithGoogleAction}>
       <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="redirectTo" value={redirectTo} />
       <Button type="submit" variant="outline" className="w-full gap-2">
         <GoogleIcon />
-        {label}
+        {t(labelKey)}
       </Button>
     </form>
   );
 }
 
-export function AuthDivider({ label = "or" }: { label?: string }) {
+export async function AuthDivider() {
+  const t = await getTranslations("Auth");
+
   return (
     <div className="flex items-center gap-3">
       <span className="h-px flex-1 bg-border" />
       <span className="text-xs uppercase tracking-wide text-muted-foreground">
-        {label}
+        {t("orDivider")}
       </span>
       <span className="h-px flex-1 bg-border" />
     </div>

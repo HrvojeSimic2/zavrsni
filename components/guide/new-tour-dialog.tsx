@@ -20,6 +20,8 @@ import { uploadTourImageFile } from "@/lib/supabase/storage";
 import { cn } from "@/lib/utils";
 
 import { createTourAction } from "@/app/[locale]/guide/tours/actions";
+import { GuideFlashError } from "@/lib/i18n/guide-flash";
+import { useTranslations } from "next-intl";
 
 type Props = {
   locale: string;
@@ -32,24 +34,27 @@ type Props = {
 };
 
 const categoryOptions = [
-  { value: "food", label: "Food" },
-  { value: "nature", label: "Nature" },
-  { value: "culture", label: "Culture" },
-  { value: "adventure", label: "Adventure" },
-  { value: "history", label: "History" },
+  "food",
+  "nature",
+  "culture",
+  "adventure",
+  "history",
 ] as const;
 
 export function NewTourDialog({
   locale,
   disabled,
   defaultOpen,
-  triggerLabel = "New tour",
+  triggerLabel,
   triggerSize = "lg",
   triggerVariant = "default",
   triggerClassName,
 }: Props) {
+  const t = useTranslations("GuideDashboard.newTour");
+  const label = triggerLabel ?? t("trigger");
   const [open, setOpen] = useState(Boolean(defaultOpen));
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const tGuide = useTranslations("GuideDashboard");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const trigger = useMemo(() => {
@@ -68,10 +73,10 @@ export function NewTourDialog({
         className={cn(emphasisClassName, triggerClassName)}
       >
         <Plus className={iconClassName} />
-        {triggerLabel}
+        {label}
       </Button>
     );
-  }, [disabled, triggerClassName, triggerLabel, triggerSize, triggerVariant]);
+  }, [disabled, label, triggerClassName, triggerSize, triggerVariant]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -91,12 +96,12 @@ export function NewTourDialog({
         } = await supabase.auth.getUser();
 
         if (userError || !user) {
-          throw new Error("Please sign in to upload tour images.");
+          throw new Error(GuideFlashError.SignInToUploadImages);
         }
 
         const uploaded = await uploadTourImageFile(supabase, user.id, imageFile);
         if (uploaded.error || !uploaded.publicUrl) {
-          throw new Error("Failed to upload image. Please try again.");
+          throw new Error(GuideFlashError.ImageUploadFailed);
         }
 
         formData.set("image", uploaded.publicUrl);
@@ -105,9 +110,12 @@ export function NewTourDialog({
       formData.delete("imageFile");
       await createTourAction(formData);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Something went wrong.";
-      setSubmitError(message);
+      // Actions surface an error key so it can be shown in the active locale.
+      const raw = error instanceof Error ? error.message : "";
+      const key = `errors.${raw}`;
+      setSubmitError(
+        raw && tGuide.has(key) ? tGuide(key) : raw || tGuide("errors.unknown")
+      );
       setIsSubmitting(false);
     }
   }
@@ -118,10 +126,8 @@ export function NewTourDialog({
       <DialogContent className="max-w-2xl p-0">
         <div className="max-h-[85vh] overflow-y-auto p-6">
           <DialogHeader>
-            <DialogTitle>Create a new tour</DialogTitle>
-            <DialogDescription>
-              Add the basics now - you can refine details later.
-            </DialogDescription>
+            <DialogTitle>{t("title")}</DialogTitle>
+            <DialogDescription>{t("description")}</DialogDescription>
           </DialogHeader>
 
           <form onSubmit={onSubmit} className="mt-5 space-y-4">
@@ -130,32 +136,32 @@ export function NewTourDialog({
 
             <div className="space-y-1">
               <label className="text-sm font-medium" htmlFor="title">
-                Title
+                {t("titleLabel")}
               </label>
               <Input
                 id="title"
                 name="title"
                 required
-                placeholder="e.g. Sunset Food Walk in Dubrovnik"
+                placeholder={t("titlePlaceholder")}
               />
             </div>
 
             <div className="space-y-1">
               <label className="text-sm font-medium" htmlFor="description">
-                Description
+                {t("descriptionLabel")}
               </label>
               <Textarea
                 id="description"
                 name="description"
                 required
-                placeholder="What will guests experience? What's included?"
+                placeholder={t("descriptionPlaceholder")}
               />
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1">
                 <label className="text-sm font-medium" htmlFor="category">
-                  Category
+                  {t("categoryLabel")}
                 </label>
                 <select
                   id="category"
@@ -164,9 +170,9 @@ export function NewTourDialog({
                   className="border-input dark:bg-input/30 flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                   defaultValue="culture"
                 >
-                  {categoryOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
+                  {categoryOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {t(`categories.${option}`)}
                     </option>
                   ))}
                 </select>
@@ -174,7 +180,7 @@ export function NewTourDialog({
 
               <div className="space-y-1">
                 <label className="text-sm font-medium" htmlFor="price">
-                  Price (EUR)
+                  {t("priceLabel")}
                 </label>
                 <Input
                   id="price"
@@ -183,7 +189,7 @@ export function NewTourDialog({
                   step="0.01"
                   min="0"
                   required
-                  placeholder="e.g. 59"
+                  placeholder={t("pricePlaceholder")}
                 />
               </div>
             </div>
@@ -191,25 +197,25 @@ export function NewTourDialog({
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1">
                 <label className="text-sm font-medium" htmlFor="location">
-                  City / Area
+                  {t("locationLabel")}
                 </label>
                 <Input
                   id="location"
                   name="location"
                   required
-                  placeholder="e.g. Dubrovnik Old Town"
+                  placeholder={t("locationPlaceholder")}
                 />
               </div>
 
               <div className="space-y-1">
                 <label className="text-sm font-medium" htmlFor="country">
-                  Country
+                  {t("countryLabel")}
                 </label>
                 <Input
                   id="country"
                   name="country"
                   required
-                  placeholder="e.g. Croatia"
+                  placeholder={t("countryPlaceholder")}
                 />
               </div>
             </div>
@@ -217,25 +223,25 @@ export function NewTourDialog({
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1">
                 <label className="text-sm font-medium" htmlFor="duration">
-                  Duration
+                  {t("durationLabel")}
                 </label>
                 <Input
                   id="duration"
                   name="duration"
                   required
-                  placeholder="e.g. 2.5 hours"
+                  placeholder={t("durationPlaceholder")}
                 />
               </div>
 
               <div className="space-y-1">
                 <label className="text-sm font-medium" htmlFor="groupSize">
-                  Group size
+                  {t("groupSizeLabel")}
                 </label>
                 <Input
                   id="groupSize"
                   name="groupSize"
                   required
-                  placeholder="e.g. Up to 10 people"
+                  placeholder={t("groupSizePlaceholder")}
                 />
               </div>
             </div>
@@ -243,22 +249,22 @@ export function NewTourDialog({
             <div className="grid gap-4 sm:grid-cols-[1fr_140px]">
               <div className="space-y-1">
                 <label className="text-sm font-medium" htmlFor="meetingPoint">
-                  Meeting point
+                  {t("meetingPointLabel")}
                 </label>
                 <Input
                   id="meetingPoint"
                   name="meetingPoint"
                   maxLength={200}
-                  placeholder="e.g. Kod Mandusevca, ispred fontane"
+                  placeholder={t("meetingPointPlaceholder")}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Shown to travellers once you confirm their booking.
+                  {t("meetingPointHelp")}
                 </p>
               </div>
 
               <div className="space-y-1">
                 <label className="text-sm font-medium" htmlFor="startTime">
-                  Start time
+                  {t("startTimeLabel")}
                 </label>
                 <Input id="startTime" name="startTime" type="time" />
               </div>
@@ -266,25 +272,25 @@ export function NewTourDialog({
 
             <div className="space-y-1">
               <label className="text-sm font-medium" htmlFor="imageFile">
-                Image (optional)
+                {t("imageLabel")}
               </label>
               <Input id="imageFile" name="imageFile" type="file" accept="image/*" />
               <p className="text-xs text-muted-foreground">
-                Upload a JPG/PNG/WebP. This will be used as the tour cover image.
+                {t("imageHelp")}
               </p>
             </div>
 
             <div className="space-y-1">
               <label className="text-sm font-medium" htmlFor="highlights">
-                Highlights (optional)
+                {t("highlightsLabel")}
               </label>
               <Textarea
                 id="highlights"
                 name="highlights"
-                placeholder="Add 3-6 key points (comma or newline separated)."
+                placeholder={t("highlightsPlaceholder")}
               />
               <p className="text-xs text-muted-foreground">
-                Example: Local tastings, Hidden alleys, Small groups
+                {t("highlightsHelp")}
               </p>
             </div>
 
@@ -296,10 +302,10 @@ export function NewTourDialog({
 
             <div className="flex items-center justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                Cancel
+                {t("cancel")}
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Creating..." : "Create tour"}
+                {isSubmitting ? t("submitting") : t("submit")}
               </Button>
             </div>
           </form>

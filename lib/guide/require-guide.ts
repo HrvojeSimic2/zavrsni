@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/server";
 import { getGuideForUser, type GuideRow } from "@/lib/guide/get-guide-for-user";
+import { AuthFlashMessage } from "@/lib/i18n/auth-flash";
 
 export type RequireGuideResult = {
   supabase: SupabaseClient;
@@ -27,7 +28,7 @@ export async function requireGuide(
   if (userError || !user) {
     const query = new URLSearchParams();
     query.set("next", `/${locale}${path}`);
-    query.set("message", "Please sign in to access the guide dashboard.");
+    query.set("message", AuthFlashMessage.SignInForGuideDashboard);
     redirect(`/${locale}/auth/sign-in?${query.toString()}`);
   }
 
@@ -35,7 +36,7 @@ export async function requireGuide(
 
   if (!guide) {
     const query = new URLSearchParams();
-    query.set("message", "Submit your application to become a guide.");
+    query.set("message", AuthFlashMessage.ApplyToBecomeGuide);
     redirect(`/${locale}/become-guide?${query.toString()}`);
   }
 

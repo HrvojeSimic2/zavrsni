@@ -12,6 +12,7 @@ import { requireGuide } from "@/lib/guide/require-guide";
 import { fetchGuideDashboardData } from "@/lib/guide/guide-dashboard-data";
 import { buildGuideSchedule } from "@/lib/guide/guide-schedule";
 import { CalendarDays, ClipboardList, Users } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 
 type PageProps = {
   params: { locale: string } | Promise<{ locale: string }>;
@@ -21,10 +22,10 @@ type PageProps = {
 };
 
 const WINDOW_OPTIONS = [
-  { days: 30, label: "30 days" },
-  { days: 60, label: "60 days" },
-  { days: 90, label: "90 days" },
-];
+  { days: 30, labelKey: "window30" },
+  { days: 60, labelKey: "window60" },
+  { days: 90, labelKey: "window90" },
+] as const;
 
 export default async function GuideSchedulePage({
   params,
@@ -32,6 +33,8 @@ export default async function GuideSchedulePage({
 }: PageProps) {
   const { locale } = await Promise.resolve(params);
   const resolvedSearch = (await Promise.resolve(searchParams)) ?? {};
+  const t = await getTranslations("GuideDashboard");
+  const tPage = await getTranslations("GuideDashboard.schedule");
 
   const requestedWindow = Number(resolvedSearch.window);
   const windowDays = WINDOW_OPTIONS.some((option) => option.days === requestedWindow)
@@ -43,30 +46,30 @@ export default async function GuideSchedulePage({
     "/guide/schedule"
   );
 
-  const { upcomingEvents, upcomingReservations, metrics } =
+  const { upcomingSlots, upcomingReservations, metrics } =
     await fetchGuideDashboardData(supabase, guide.id, {
       windowDays,
-      eventLimit: 400,
+      slotLimit: 400,
       reservationLimit: 400,
     });
 
   const today = new Date().toISOString().slice(0, 10);
-  const schedule = buildGuideSchedule(upcomingEvents, upcomingReservations);
+  const schedule = buildGuideSchedule(upcomingSlots, upcomingReservations);
   const daysWithBookings = schedule.filter((day) => day.bookedGuests > 0).length;
 
   return (
     <PageShell variant="contained" contentClassName="max-w-6xl space-y-8">
       <GuidePageHeader
-        title="Schedule"
-        description="Every scheduled date with the guests booked on it."
+        title={tPage("title")}
+        description={tPage("description")}
         badge={
           <Badge variant={guide.verified ? "default" : "secondary"}>
-            {guide.verified ? "Verified" : "Not verified"}
+            {guide.verified ? t("verified") : t("notVerified")}
           </Badge>
         }
         actions={
           <Button asChild variant="outline">
-            <Link href="/guide/events">Manage availability</Link>
+            <Link href="/guide/events">{tPage("manageAvailability")}</Link>
           </Button>
         }
       />
@@ -77,30 +80,34 @@ export default async function GuideSchedulePage({
         <ClaimGuideProfileCard
           locale={locale}
           guideId={guide.id}
-          description="Claim your profile to manage availability and reservations."
+          descriptionKey="descriptionAvailability"
         />
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <GuideMetricCard
-          label="Scheduled days"
+          label={tPage("metricDays")}
           value={schedule.length}
-          hint={`${daysWithBookings} with bookings`}
+          hint={tPage("metricDaysHint", { n: daysWithBookings })}
           icon={CalendarDays}
         />
         <GuideMetricCard
-          label="Guests booked"
+          label={tPage("metricGuests")}
           value={metrics.upcomingGuests}
-          hint={`${metrics.upcomingReservationCount} reservations`}
+          hint={tPage("metricGuestsHint", {
+            n: metrics.upcomingReservationCount,
+          })}
           icon={Users}
         />
         <GuideMetricCard
-          label="Spots left"
-          value={metrics.upcomingSpots}
+          label={tPage("metricOpen")}
+          value={metrics.openSlotCount}
           hint={
             metrics.fillRate === null
-              ? "No capacity scheduled"
-              : `${Math.round(metrics.fillRate * 100)}% of capacity sold`
+              ? tPage("metricOpenNoSlots")
+              : tPage("metricOpenHint", {
+                  percent: Math.round(metrics.fillRate * 100),
+                })
           }
           icon={ClipboardList}
         />
@@ -108,7 +115,7 @@ export default async function GuideSchedulePage({
 
       <Card>
         <CardHeader className="border-b">
-          <CardTitle>Next {windowDays} days</CardTitle>
+          <CardTitle>{tPage("windowTitle", { n: windowDays })}</CardTitle>
           <CardAction>
             <div className="flex flex-wrap gap-1">
               {WINDOW_OPTIONS.map((option) => (
@@ -119,7 +126,7 @@ export default async function GuideSchedulePage({
                   variant={option.days === windowDays ? "default" : "outline"}
                 >
                   <Link href={`/guide/schedule?window=${option.days}`}>
-                    {option.label}
+                    {tPage(option.labelKey)}
                   </Link>
                 </Button>
               ))}

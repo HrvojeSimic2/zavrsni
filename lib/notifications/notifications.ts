@@ -23,7 +23,8 @@ export type AppNotification = {
   /** Drives unread state; the moment the status last changed. */
   timestamp: string;
   href: string;
-  tourTitle: string | null;
+  /** "14.03. · 09:00", the shape a person recognises their own booking by. */
+  timeLabel: string | null;
   /** Traveller name for guides, guide name for travellers. */
   personName: string | null;
   date: string | null;
@@ -36,6 +37,13 @@ const MAX_PER_SOURCE = 15;
 function firstRelation<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null;
   return value ?? null;
+}
+
+/** "09:00" when the booking has a start time, otherwise nothing. */
+function timeLabelOf(row: Record<string, unknown>): string | null {
+  const raw = String(row.start_time ?? "").trim();
+  const match = /^(d{1,2}):(d{2})/.exec(raw);
+  return match ? `${match[1].padStart(2, "0")}:${match[2]}` : null;
 }
 
 function timestampOf(row: { updated_at?: unknown; created_at?: unknown }): string {
@@ -55,7 +63,7 @@ async function fetchGuideRequests(
   const { data, error } = await supabase
     .from("reservations")
     .select(
-      "id, date, party_size, status, customer_name, created_at, updated_at, tour:tours ( id, title )"
+      "id, date, start_time, party_size, status, customer_name, created_at, updated_at"
     )
     .eq("guide_id", guide.id)
     .eq("status", "pending")
@@ -69,17 +77,13 @@ async function fetchGuideRequests(
   }
 
   return ((data ?? []) as Array<Record<string, unknown>>).map((row) => {
-    const tour = firstRelation(
-      row.tour as { id: string; title: string } | { id: string; title: string }[] | null
-    );
-
     return {
       id: `request:${String(row.id)}`,
       kind: "reservation_request" as const,
       audience: "guide" as const,
       timestamp: timestampOf(row),
       href: "/guide/reservations",
-      tourTitle: tour?.title ?? null,
+      timeLabel: timeLabelOf(row),
       personName: (row.customer_name as string | null) ?? null,
       date: (row.date as string | null) ?? null,
       partySize: row.party_size === null ? null : Number(row.party_size),
@@ -99,7 +103,7 @@ async function fetchTravellerUpdates(
   const { data, error } = await supabase
     .from("reservations")
     .select(
-      "id, date, party_size, status, created_at, updated_at, tour:tours ( id, title ), guide:guides ( id, name )"
+      "id, date, start_time, party_size, status, created_at, updated_at, guide:guides ( id, name )"
     )
     .ilike("customer_email", email)
     .gte("date", today)
@@ -113,9 +117,6 @@ async function fetchTravellerUpdates(
 
   return ((data ?? []) as Array<Record<string, unknown>>)
     .map((row): AppNotification | null => {
-      const tour = firstRelation(
-        row.tour as { id: string; title: string } | { id: string; title: string }[] | null
-      );
       const guide = firstRelation(
         row.guide as { id: string; name: string } | { id: string; name: string }[] | null
       );
@@ -128,7 +129,7 @@ async function fetchTravellerUpdates(
             ? "reservation_declined"
             : "reservation_pending";
 
-      // A completed tour is history, not something awaiting approval.
+      // A finished booking is history, not something awaiting approval.
       if (status === "completed") return null;
 
       return {
@@ -137,7 +138,7 @@ async function fetchTravellerUpdates(
         audience: "traveller" as const,
         timestamp: timestampOf(row),
         href: "/bookings",
-        tourTitle: tour?.title ?? null,
+        timeLabel: timeLabelOf(row),
         personName: guide?.name ?? null,
         date: (row.date as string | null) ?? null,
         partySize: row.party_size === null ? null : Number(row.party_size),
@@ -177,7 +178,7 @@ async function fetchApplicationStatus(
       audience: "traveller",
       timestamp: reviewedAt || timestampOf(application),
       href: status === "accepted" ? "/guide" : "/become-guide",
-      tourTitle: null,
+      timeLabel: null,
       personName: null,
       date: null,
       partySize: null,

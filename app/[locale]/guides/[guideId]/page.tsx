@@ -9,7 +9,9 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchGuideProfile } from "@/lib/services/guide-service";
 import { getInitials } from "@/lib/guide/get-initials";
 import { formatScheduleDate } from "@/lib/guide/reservation-status";
-import { formatMoney } from "@/lib/format/money";
+import { formatHourlyRate } from "@/lib/format/money";
+import { usablePhoto } from "@/lib/media/usable-photo";
+import { GuideBookingPanel } from "@/components/guide/guide-booking-panel";
 import {
   fetchConfirmedBookingWithGuide,
   fetchGuideContact,
@@ -24,24 +26,13 @@ import {
   Star,
 } from "lucide-react";
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
+import { AuthFlashMessage } from "@/lib/i18n/auth-flash";
 
-const interestLabels: Record<string, string> = {
-  food: "Food",
-  nature: "Nature",
-  culture: "Culture",
-  adventure: "Adventure",
-  history: "History",
-};
-
-function formatPlace(location: string | null, country: string | null) {
-  const parts = [location, country].map((part) => String(part ?? "").trim());
-  return parts.filter(Boolean).join(", ");
-}
-
-function Stars({ rating }: { rating: number }) {
+function Stars({ rating, label }: { rating: number; label: string }) {
   const rounded = Math.round(rating);
   return (
-    <span className="inline-flex items-center gap-0.5" aria-label={`${rating} out of 5`}>
+    <span className="inline-flex items-center gap-0.5" aria-label={label}>
       {Array.from({ length: 5 }).map((_, index) => (
         <Star
           key={index}
@@ -66,23 +57,33 @@ export default async function GuideProfilePage({
     | Promise<{ locale: string; guideId: string }>;
 }) {
   const { locale, guideId } = await Promise.resolve(params);
+  const t = await getTranslations("GuideProfile");
+  const starsLabel = (value: number) =>
+    t("starsAria", { rating: value.toFixed(1) });
 
   const {
     guide: guideRow,
     interests,
     rating,
     reviewCount,
+    hourlyRate,
+    maxGroupSize,
     availableToday,
     nextAvailableDate,
-    tours,
+    slots,
     reviews,
   } = await fetchGuideProfile(guideId);
 
   if (!guideRow) notFound();
 
   const languages = guideRow.languages ?? [];
-  const languagesLabel = languages.length > 0 ? languages.join(" · ") : "—";
+  const languagesLabel =
+    languages.length > 0 ? languages.join(" · ") : t("empty");
   const yearsExperience = guideRow.years_experience ?? null;
+  const rateLabel = formatHourlyRate(locale, hourlyRate);
+
+  // Taken slots stay out of the picker; the schedule is the guide's business.
+  const openSlots = slots.filter((slot) => !slot.booked);
 
   const supabase = await createClient();
   const {
@@ -103,17 +104,19 @@ export default async function GuideProfilePage({
     : { email: null, phone: null };
 
   const guide = { ...guideRow, ...contact };
+  const firstName = guide.name.split(/\s+/)[0];
 
   const signInQuery = new URLSearchParams();
   signInQuery.set("next", `/${locale}/guides/${guideId}`);
-  signInQuery.set("message", "Sign in to connect with this guide.");
+  signInQuery.set("message", AuthFlashMessage.SignInToConnect);
+  const signInHref = `/auth/sign-in?${signInQuery.toString()}`;
 
   return (
     <PageShell variant="contained" contentClassName="max-w-5xl space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-4 min-w-0">
           <Avatar className="h-20 w-20">
-            <AvatarImage src={guide.avatar ?? undefined} alt={guide.name} />
+            <AvatarImage src={usablePhoto(guide.avatar) ?? undefined} alt={guide.name} />
             <AvatarFallback>{getInitials(guide.name)}</AvatarFallback>
           </Avatar>
           <div className="min-w-0 space-y-1">
@@ -126,23 +129,23 @@ export default async function GuideProfilePage({
             <div className="flex flex-wrap items-center gap-2 pt-1 text-sm text-muted-foreground">
               <span className="inline-flex items-center gap-1">
                 <MapPin className="h-4 w-4" />
-                {guide.location ?? "—"}
+                {guide.location ?? t("empty")}
               </span>
               {reviewCount > 0 ? (
                 <span className="inline-flex items-center gap-1">
-                  <Stars rating={rating} />
+                  <Stars rating={rating} label={starsLabel(rating)} />
                   {rating.toFixed(1)} ({reviewCount})
                 </span>
               ) : null}
               {guide.verified ? (
                 <Badge className="bg-primary/10 text-primary border-primary/20">
                   <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                  Verified
+                  {t("verified")}
                 </Badge>
               ) : null}
               {availableToday ? (
                 <Badge className="bg-secondary/15 text-secondary border-secondary/30">
-                  Available today
+                  {t("availableToday")}
                 </Badge>
               ) : null}
             </div>
@@ -152,11 +155,11 @@ export default async function GuideProfilePage({
         <div className="flex flex-wrap gap-2">
           {isOwnProfile ? (
             <Button asChild variant="outline">
-              <Link href="/guide/profile">Edit profile</Link>
+              <Link href="/guide/profile">{t("editProfile")}</Link>
             </Button>
           ) : null}
           <Button asChild variant="outline">
-            <Link href="/browse">Find another guide</Link>
+            <Link href="/browse">{t("findAnother")}</Link>
           </Button>
         </div>
       </div>
@@ -166,7 +169,7 @@ export default async function GuideProfilePage({
           {guide.bio ? (
             <Card>
               <CardHeader>
-                <CardTitle>About {guide.name.split(/\s+/)[0]}</CardTitle>
+                <CardTitle>{t("aboutTitle", { name: firstName })}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
@@ -178,7 +181,7 @@ export default async function GuideProfilePage({
 
           <Card>
             <CardHeader>
-              <CardTitle>What this guide is great at</CardTitle>
+              <CardTitle>{t("strengthsTitle")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-wrap gap-2">
@@ -189,12 +192,14 @@ export default async function GuideProfilePage({
                       variant="outline"
                       className="rounded-full"
                     >
-                      {interestLabels[interest] ?? interest}
+                      {t.has(`interests.${interest}`)
+                        ? t(`interests.${interest}`)
+                        : interest}
                     </Badge>
                   ))
                 ) : (
                   <Badge variant="outline" className="rounded-full">
-                    Fully customizable
+                    {t("fullyCustomizable")}
                   </Badge>
                 )}
               </div>
@@ -203,29 +208,39 @@ export default async function GuideProfilePage({
 
               <dl className="grid gap-3 text-sm sm:grid-cols-2">
                 <div>
-                  <dt className="text-muted-foreground">Languages</dt>
+                  <dt className="text-muted-foreground">{t("languagesLabel")}</dt>
                   <dd className="font-medium">{languagesLabel}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">Experience</dt>
+                  <dt className="text-muted-foreground">{t("experienceLabel")}</dt>
                   <dd className="font-medium">
                     {yearsExperience !== null
-                      ? `${yearsExperience} year${yearsExperience === 1 ? "" : "s"} guiding`
-                      : "—"}
+                      ? t("experienceYears", { count: yearsExperience })
+                      : t("empty")}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">Tours offered</dt>
-                  <dd className="font-medium">{tours.length}</dd>
+                  <dt className="text-muted-foreground">{t("rateLabel")}</dt>
+                  <dd className="font-medium">
+                    {rateLabel
+                      ? t("rateFrom", { rate: rateLabel })
+                      : t("rateOnRequest")}
+                  </dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">Next available</dt>
+                  <dt className="text-muted-foreground">{t("groupLabel")}</dt>
+                  <dd className="font-medium">
+                    {t("groupUpTo", { count: maxGroupSize })}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">{t("nextAvailableLabel")}</dt>
                   <dd className="font-medium">
                     {availableToday
-                      ? "Today"
+                      ? t("today")
                       : nextAvailableDate
                         ? formatScheduleDate(locale, nextAvailableDate)
-                        : "—"}
+                        : t("empty")}
                   </dd>
                 </div>
               </dl>
@@ -244,78 +259,60 @@ export default async function GuideProfilePage({
             </CardContent>
           </Card>
 
-          <Card>
+          {/*
+           * Where a tour listing used to be: the guide's open time. You are not
+           * picking a product, you are asking for a block of their day.
+           */}
+          <Card id="request">
             <CardHeader>
-              <CardTitle>Tours by {guide.name.split(/\s+/)[0]}</CardTitle>
+              <CardTitle>{t("booking.title", { name: firstName })}</CardTitle>
             </CardHeader>
             <CardContent>
-              {tours.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  This guide has not published any tours yet.
-                </p>
-              ) : (
-                <div className="overflow-hidden rounded-lg border">
-                  {tours.map((tour) => (
-                    <Link
-                      key={tour.id}
-                      href={`/tour/${tour.id}`}
-                      className="flex items-center justify-between gap-4 px-4 py-3 text-sm transition-colors hover:bg-muted/20 [&:not(:last-child)]:border-b"
-                    >
-                      <div className="min-w-0">
-                        <div className="font-medium truncate">{tour.title}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {[
-                            formatPlace(tour.location, tour.country),
-                            tour.duration,
-                          ]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </div>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        {tour.price !== null ? (
-                          <div className="font-medium">{formatMoney(locale, tour.price)}</div>
-                        ) : null}
-                        {tour.reviewCount > 0 ? (
-                          <div className="text-xs text-muted-foreground">
-                            {tour.rating.toFixed(1)} ({tour.reviewCount})
-                          </div>
-                        ) : null}
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
+              <GuideBookingPanel
+                locale={locale}
+                guideFirstName={firstName}
+                slots={openSlots.map((slot) => ({
+                  id: slot.id,
+                  date: slot.date,
+                  startTime: slot.startTime,
+                  endTime: slot.endTime,
+                  note: slot.note,
+                  durationHours: slot.durationHours,
+                }))}
+                hourlyRate={hourlyRate}
+                maxGroupSize={maxGroupSize}
+                signedIn={Boolean(user)}
+                isOwnProfile={isOwnProfile}
+                signInHref={signInHref}
+              />
             </CardContent>
           </Card>
 
           {reviews.length > 0 ? (
             <Card>
               <CardHeader>
-                <CardTitle>What travellers say</CardTitle>
+                <CardTitle>{t("reviewsTitle")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {reviews.map((review) => (
                   <div key={review.id} className="flex gap-3">
                     <Avatar className="h-9 w-9 shrink-0">
-                      <AvatarImage src={review.avatar ?? undefined} alt={review.author} />
+                      <AvatarImage src={usablePhoto(review.avatar) ?? undefined} alt={review.author} />
                       <AvatarFallback>{getInitials(review.author)}</AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-sm font-medium">{review.author}</span>
-                        <Stars rating={review.rating} />
+                        <Stars
+                          rating={review.rating}
+                          label={starsLabel(review.rating)}
+                        />
                         {review.date ? (
                           <span className="text-xs text-muted-foreground">
                             {formatScheduleDate(locale, review.date)}
                           </span>
                         ) : null}
                       </div>
-                      {review.tourTitle ? (
-                        <div className="text-xs text-muted-foreground">
-                          {review.tourTitle}
-                        </div>
-                      ) : null}
                       <p className="text-sm text-muted-foreground">
                         {review.comment}
                       </p>
@@ -328,18 +325,11 @@ export default async function GuideProfilePage({
 
           <Card>
             <CardHeader>
-              <CardTitle>How LocalPath works here</CardTitle>
+              <CardTitle>{t("howTitle")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
-              <p>
-                LocalPath’s job is to match you with the best guide for your
-                location, interests, and availability.
-              </p>
-              <p>
-                After you connect, you and the guide decide the exact tour plan
-                together (route, timing, pace, stops, food, accessibility, and
-                any special requests).
-              </p>
+              <p>{t("howBody1")}</p>
+              <p>{t("howBody2")}</p>
             </CardContent>
           </Card>
         </div>
@@ -347,18 +337,16 @@ export default async function GuideProfilePage({
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Connect</CardTitle>
+              <CardTitle>{t("connectTitle")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {!user ? (
                 <>
                   <div className="text-sm text-muted-foreground">
-                    Sign in to book a tour and connect with this guide.
+                    {t("signInPrompt")}
                   </div>
                   <Button className="w-full" asChild>
-                    <Link href={`/auth/sign-in?${signInQuery.toString()}`}>
-                      Sign in to connect
-                    </Link>
+                    <Link href={signInHref}>{t("signInAction")}</Link>
                   </Button>
                 </>
               ) : canSeeContact ? (
@@ -366,16 +354,15 @@ export default async function GuideProfilePage({
                   {confirmedBooking ? (
                     <div className="rounded-lg border bg-muted/20 p-3 text-sm">
                       <div className="font-medium">
-                        {confirmedBooking.tourTitle}
+                        {formatScheduleDate(locale, confirmedBooking.date)}
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">
-                        {formatScheduleDate(locale, confirmedBooking.date)}
-                        {confirmedBooking.startTime
-                          ? ` · ${confirmedBooking.startTime.slice(0, 5)}`
-                          : ""}
-                        {` · ${confirmedBooking.partySize} ${
-                          confirmedBooking.partySize === 1 ? "guest" : "guests"
-                        }`}
+                        {confirmedBooking.startTime && confirmedBooking.endTime
+                          ? `${confirmedBooking.startTime} – ${confirmedBooking.endTime}`
+                          : confirmedBooking.startTime ?? ""}
+                        {` · ${t("guests", {
+                          count: confirmedBooking.partySize,
+                        })}`}
                       </div>
                       {confirmedBooking.meetingPoint ? (
                         <div className="mt-2 flex items-start gap-1.5 text-xs">
@@ -384,35 +371,39 @@ export default async function GuideProfilePage({
                         </div>
                       ) : (
                         <div className="mt-2 text-xs text-muted-foreground">
-                          Agree on a meeting point with your guide.
+                          {t("agreeMeetingPoint")}
                         </div>
                       )}
                     </div>
                   ) : (
                     <div className="text-sm text-muted-foreground">
-                      Share your preferences and set a time to plan together.
+                      {t("sharePreferences")}
                     </div>
                   )}
 
                   <div className="space-y-2 text-sm">
                     <div>
-                      <span className="font-medium">Email:</span>{" "}
+                      <span className="font-medium">{t("emailLabel")}</span>{" "}
                       {guide.email ? (
                         <a className="underline" href={`mailto:${guide.email}`}>
                           {guide.email}
                         </a>
                       ) : (
-                        <span className="text-muted-foreground">Not provided</span>
+                        <span className="text-muted-foreground">
+                          {t("notProvided")}
+                        </span>
                       )}
                     </div>
                     <div>
-                      <span className="font-medium">Phone:</span>{" "}
+                      <span className="font-medium">{t("phoneLabel")}</span>{" "}
                       {guide.phone ? (
                         <a className="underline" href={`tel:${guide.phone}`}>
                           {guide.phone}
                         </a>
                       ) : (
-                        <span className="text-muted-foreground">Not provided</span>
+                        <span className="text-muted-foreground">
+                          {t("notProvided")}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -420,10 +411,10 @@ export default async function GuideProfilePage({
                   {confirmedBooking ? (
                     <Button variant="outline" className="w-full" asChild>
                       <a
-                        href={`/api/reservations/${confirmedBooking.id}/calendar`}
+                        href={`/api/reservations/${confirmedBooking.id}/calendar?locale=${locale}`}
                       >
                         <CalendarPlus className="size-4" />
-                        Add to calendar
+                        {t("addToCalendar")}
                       </a>
                     </Button>
                   ) : null}
@@ -432,21 +423,18 @@ export default async function GuideProfilePage({
                 <>
                   <div className="flex items-start gap-2 rounded-lg border border-dashed bg-muted/10 p-3 text-sm text-muted-foreground">
                     <Lock className="mt-0.5 size-4 shrink-0" />
-                    <span>
-                      Contact details and the meeting point unlock once{" "}
-                      {guide.name.split(/\s+/)[0]} confirms your booking.
-                    </span>
+                    <span>{t("contactLocked", { name: firstName })}</span>
                   </div>
-                  {tours.length > 0 ? (
+                  {openSlots.length > 0 ? (
                     <Button className="w-full" asChild>
-                      <Link href={`/tour/${tours[0].id}`}>Request a booking</Link>
+                      <a href="#request">{t("requestBooking")}</a>
                     </Button>
                   ) : null}
                 </>
               )}
 
               <Button variant="outline" className="w-full" asChild>
-                <Link href="/browse">Browse more guides</Link>
+                <Link href="/browse">{t("browseMore")}</Link>
               </Button>
             </CardContent>
           </Card>

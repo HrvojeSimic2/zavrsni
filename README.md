@@ -71,7 +71,7 @@ select pg_notify('pgrst', 'reload schema');
 If set, new applications email the admins with a link to the review screen:
 
 - `RESEND_API_KEY`
-- `RESEND_FROM` (e.g. `LocalPath <noreply@yourdomain.com>`)
+- `RESEND_FROM` (e.g. `Peregrine <noreply@yourdomain.com>`)
 - `NEXT_PUBLIC_SITE_URL` (used to build the review link, e.g. `http://localhost:3000`)
 
 ## Learn More

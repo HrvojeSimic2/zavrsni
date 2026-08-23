@@ -1,10 +1,10 @@
 /**
  * Single source of truth for money formatting.
  *
- * Prices are stored as plain numbers with no currency column on `tours`, and
+ * Prices are stored as plain numbers with no currency column on `guides`, and
  * reservations record EUR. Anything that renders a price must agree with what
- * gets written to `reservations.total_amount`, or the tour page and the guide
- * dashboard quote different currencies for the same booking.
+ * gets written to `reservations.total_amount`, or the guide's profile and the
+ * guide dashboard quote different currencies for the same booking.
  */
 export const DEFAULT_CURRENCY = "EUR";
 
@@ -30,4 +30,22 @@ export function formatMoney(
   } catch {
     return `${value.toFixed(digits)} ${currency}`;
   }
+}
+
+/**
+ * The guide's rate, as an amount per hour.
+ *
+ * Surfaced as "from X/h" in the UI: the rate is what an hour of their time
+ * costs, and the total depends on how long a slot the traveller takes — not on
+ * how many people come along.
+ */
+export function formatHourlyRate(
+  locale: string,
+  rate: number | null | undefined,
+  currency: string = DEFAULT_CURRENCY
+): string | null {
+  if (rate === null || rate === undefined) return null;
+  const value = Number(rate);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return `${formatMoney(locale, value, currency)}/h`;
 }

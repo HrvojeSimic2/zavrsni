@@ -1,9 +1,12 @@
+import { getTranslations } from "next-intl/server";
+
 import { updatePasswordAction } from "../actions";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { resolveFlash } from "@/lib/i18n/flash";
 
 type PageProps = {
   params: { locale: string } | Promise<{ locale: string }>;
@@ -16,22 +19,28 @@ export default async function UpdatePasswordPage({
 }: PageProps) {
   const { locale } = await Promise.resolve(params);
   const resolvedSearchParams = await Promise.resolve(searchParams);
-  const error =
+  const tAuth = await getTranslations("Auth");
+  const t = await getTranslations("Auth.update");
+  const error = resolveFlash(
+    tAuth,
+    "errors",
     typeof resolvedSearchParams?.error === "string"
       ? resolvedSearchParams.error
-      : "";
-  const message =
+      : ""
+  );
+  const message = resolveFlash(
+    tAuth,
+    "messages",
     typeof resolvedSearchParams?.message === "string"
       ? resolvedSearchParams.message
-      : "";
+      : ""
+  );
 
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
-        <CardTitle>Set a new password</CardTitle>
-        <CardDescription>
-          Choose a strong password to secure your account.
-        </CardDescription>
+        <CardTitle>{t("title")}</CardTitle>
+        <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {error ? (
@@ -47,7 +56,7 @@ export default async function UpdatePasswordPage({
         <form action={updatePasswordAction} className="space-y-4">
           <input type="hidden" name="locale" value={locale} />
           <div className="space-y-2">
-            <Label htmlFor="password">New password</Label>
+            <Label htmlFor="password">{t("passwordLabel")}</Label>
             <Input
               id="password"
               name="password"
@@ -57,7 +66,7 @@ export default async function UpdatePasswordPage({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm new password</Label>
+            <Label htmlFor="confirmPassword">{t("confirmPasswordLabel")}</Label>
             <Input
               id="confirmPassword"
               name="confirmPassword"
@@ -67,15 +76,15 @@ export default async function UpdatePasswordPage({
             />
           </div>
           <Button type="submit" className="w-full">
-            Update password
+            {t("submit")}
           </Button>
         </form>
       </CardContent>
       <CardFooter className="flex flex-col text-sm text-muted-foreground">
         <span>
-          Back to{" "}
+          {t("backTo")}{" "}
           <Link href="/auth/sign-in" className="text-primary hover:underline">
-            sign in
+            {t("signInLink")}
           </Link>
           .
         </span>
