@@ -19,6 +19,8 @@ import { createClient } from "@/lib/supabase/server";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { ImageIcon } from "lucide-react";
+import { AuthFlashMessage } from "@/lib/i18n/auth-flash";
+import { getTranslations } from "next-intl/server";
 
 type PageProps = {
   params: { locale: string } | Promise<{ locale: string }>;
@@ -37,15 +39,17 @@ type TourRow = {
   image: string | null;
 };
 
-function formatCategory(value: string) {
+function formatCategory(value: string, fallback: string) {
   const trimmed = value.trim();
-  if (!trimmed) return "Tour";
+  if (!trimmed) return fallback;
   return `${trimmed.slice(0, 1).toUpperCase()}${trimmed.slice(1)}`;
 }
 
 export default async function GuideToursPage({ params, searchParams }: PageProps) {
   const { locale } = await Promise.resolve(params);
   const resolvedSearchParams = await Promise.resolve(searchParams);
+  const t = await getTranslations("GuideDashboard");
+  const tPage = await getTranslations("GuideDashboard.tours");
 
   const supabase = await createClient();
   const {
@@ -57,7 +61,7 @@ export default async function GuideToursPage({ params, searchParams }: PageProps
     const next = `/${locale}/guide/tours`;
     const query = new URLSearchParams();
     query.set("next", next);
-    query.set("message", "Please sign in to access the guide dashboard.");
+    query.set("message", AuthFlashMessage.SignInForGuideDashboard);
     redirect(`/${locale}/auth/sign-in?${query.toString()}`);
   }
 
@@ -65,7 +69,7 @@ export default async function GuideToursPage({ params, searchParams }: PageProps
 
   if (!guide) {
     const query = new URLSearchParams();
-    query.set("message", "Submit your application to become a guide.");
+    query.set("message", AuthFlashMessage.ApplyToBecomeGuide);
     redirect(`/${locale}/become-guide?${query.toString()}`);
   }
 
@@ -87,11 +91,11 @@ export default async function GuideToursPage({ params, searchParams }: PageProps
   return (
     <PageShell variant="contained" contentClassName="max-w-6xl space-y-8">
       <GuidePageHeader
-        title="Tours"
-        description="Create and manage your tour listings."
+        title={tPage("title")}
+        description={tPage("description")}
         badge={
           <Badge variant={guide.verified ? "default" : "secondary"}>
-            {guide.verified ? "Verified" : "Not verified"}
+            {guide.verified ? t("verified") : t("notVerified")}
           </Badge>
         }
         actions={
@@ -102,7 +106,7 @@ export default async function GuideToursPage({ params, searchParams }: PageProps
               defaultOpen={shouldOpenNewDialog}
             />
             <Button asChild variant="outline">
-              <Link href="/browse">View marketplace</Link>
+              <Link href="/browse">{tPage("viewMarketplace")}</Link>
             </Button>
           </>
         }
@@ -113,20 +117,20 @@ export default async function GuideToursPage({ params, searchParams }: PageProps
       {createdId ? (
         <Card className="bg-muted/10">
           <CardHeader className="border-b">
-            <CardTitle>Tour created</CardTitle>
+            <CardTitle>{tPage("createdTitle")}</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">
-              Your tour is now live on the marketplace.
+              {tPage("createdBody")}
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <Button asChild size="sm">
-                <Link href={`/tour/${createdId}`}>View tour</Link>
+                <Link href={`/tour/${createdId}`}>{tPage("viewTour")}</Link>
               </Button>
               <NewTourDialog
                 locale={locale}
                 disabled={needsClaim}
-                triggerLabel="Create another"
+                triggerLabel={tPage("createAnother")}
                 triggerVariant="outline"
                 triggerSize="sm"
               />
@@ -139,27 +143,27 @@ export default async function GuideToursPage({ params, searchParams }: PageProps
         <ClaimGuideProfileCard
           locale={locale}
           guideId={guide.id}
-          description="Claim your profile to create tours, manage availability, and handle reservations."
+          descriptionKey="descriptionTours"
         />
       ) : null}
 
       <Card>
         <CardHeader className="border-b">
-          <CardTitle>Your tours</CardTitle>
+          <CardTitle>{tPage("yourToursTitle")}</CardTitle>
           <CardAction>
-            <Badge variant="secondary">{tourRows.length} total</Badge>
+            <Badge variant="secondary">
+              {tPage("total", { n: tourRows.length })}
+            </Badge>
           </CardAction>
         </CardHeader>
         <CardContent>
           {tourRows.length === 0 ? (
             <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed bg-muted/10 p-4">
-              <p className="text-sm text-muted-foreground">
-                No tours yet. Create your first tour to start accepting reservations.
-              </p>
+              <p className="text-sm text-muted-foreground">{tPage("empty")}</p>
               <NewTourDialog
                 locale={locale}
                 disabled={needsClaim}
-                triggerLabel="Create your first tour"
+                triggerLabel={tPage("createFirst")}
               />
             </div>
           ) : (
@@ -189,7 +193,10 @@ export default async function GuideToursPage({ params, searchParams }: PageProps
                       <div className="font-medium truncate">{tour.title}</div>
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                         <span className="capitalize">
-                          {formatCategory(tour.category)}
+                          {formatCategory(
+                            tour.category,
+                            tPage("fallbackCategory")
+                          )}
                         </span>
                         <span className="text-muted-foreground/60">|</span>
                         <span className="truncate">
@@ -202,7 +209,7 @@ export default async function GuideToursPage({ params, searchParams }: PageProps
                   </div>
                   <div className="flex items-center gap-2">
                     <Button asChild variant="outline" size="sm">
-                      <Link href={`/tour/${tour.id}`}>Preview</Link>
+                      <Link href={`/tour/${tour.id}`}>{tPage("preview")}</Link>
                     </Button>
                   </div>
                 </div>

@@ -6,6 +6,8 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { getGuideForUser } from "@/lib/guide/get-guide-for-user";
+import { AuthFlashMessage } from "@/lib/i18n/auth-flash";
+import { GuideFlashError } from "@/lib/i18n/guide-flash";
 
 const categorySchema = z.enum([
   "food",
@@ -31,7 +33,7 @@ const createTourSchema = z.object({
       return parsed;
     })
     .refine((value) => Number.isFinite(value) && value >= 0, {
-      message: "Price must be a valid number.",
+      message: GuideFlashError.PriceInvalid,
     }),
   duration: z.string().trim().min(1).max(80),
   groupSize: z.string().trim().min(1).max(80),
@@ -41,7 +43,7 @@ const createTourSchema = z.object({
     .trim()
     .optional()
     .refine((value) => !value || /^d{2}:d{2}$/.test(value), {
-      message: "Start time must look like 09:30.",
+      message: GuideFlashError.StartTimeInvalid,
     }),
   image: z
     .string()
@@ -89,7 +91,7 @@ export async function createTourAction(formData: FormData) {
 
   const parsed = createTourSchema.safeParse(raw);
   if (!parsed.success) {
-    throw new Error("Invalid tour details.");
+    throw new Error(GuideFlashError.InvalidTourDetails);
   }
 
   const {
@@ -118,19 +120,19 @@ export async function createTourAction(formData: FormData) {
     const nextPath = `/${locale}/guide/tours/new`;
     const query = new URLSearchParams();
     query.set("next", nextPath);
-    query.set("message", "Please sign in to continue.");
+    query.set("message", AuthFlashMessage.SignInToContinue);
     redirect(`/${locale}/auth/sign-in?${query.toString()}`);
   }
 
   const { guide, needsClaim } = await getGuideForUser(supabase, user);
   if (!guide) {
     const query = new URLSearchParams();
-    query.set("message", "Submit your application to become a guide.");
+    query.set("message", AuthFlashMessage.ApplyToBecomeGuide);
     redirect(`/${locale}/become-guide?${query.toString()}`);
   }
   if (needsClaim) {
     const query = new URLSearchParams();
-    query.set("message", "Claim your guide profile before creating tours.");
+    query.set("message", AuthFlashMessage.ClaimGuideProfile);
     redirect(`/${locale}/guide?${query.toString()}`);
   }
 
@@ -159,14 +161,13 @@ export async function createTourAction(formData: FormData) {
 
   if (insertError) {
     console.warn("[guide.tours] failed to create tour", insertError);
-    if (insertError.code === "42501") {
-      const help =
-        "Row-level security blocked the insert. Make sure the guide tour policies migration is applied (e.g. `supabase/migrations/20260211120000_add_guide_tour_policies.sql`). For local dev, try `npm run supabase:reset`.";
-      if (process.env.NODE_ENV !== "production") {
-        throw new Error(`Failed to create tour. ${help}`);
-      }
+    if (
+      insertError.code === "42501" &&
+      process.env.NODE_ENV !== "production"
+    ) {
+      throw new Error(GuideFlashError.TourPolicyMissing);
     }
-    throw new Error("Failed to create tour.");
+    throw new Error(GuideFlashError.CreateTourFailed);
   }
 
   revalidatePath(`/${locale}/guide`);
